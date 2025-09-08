@@ -4,27 +4,8 @@ import { config, validateConfig } from "./config.js";
 import logger from "./utils/logger.js";
 import notificationService from "./services/notifications.js";
 import riskManager from "./services/riskManager.js";
+import { initializeDeploy } from "./services/deploy.js";
 
-// Start dashboard server if enabled
-let dashboardServer = null;
-if (process.env.ENABLE_DASHBOARD === 'true') {
-  try {
-    const dashboardApp = await import("./dashboard/server.js");
-    dashboardServer = dashboardApp.default;
-    logger.info("Dashboard server started");
-  } catch (error) {
-    logger.warn("Failed to start dashboard server", error);
-  }
-}
-
-// Validate configuration before starting
-try {
-  validateConfig();
-  logger.info("Configuration validated successfully");
-} catch (error) {
-  logger.error("Configuration validation failed", error);
-  process.exit(1);
-}
 
 // Check wallet balance
 const checkWalletBalance = async () => {
@@ -60,6 +41,31 @@ const checkWalletBalance = async () => {
     process.exit(1);
   }
 };
+
+// Start dashboard server if enabled
+let dashboardServer = null;
+    initializeDeploy();
+if (process.env.ENABLE_DASHBOARD === 'true') {
+  
+  try {
+    const dashboardApp = await import("./dashboard/server.js");
+    dashboardServer = dashboardApp.default;
+    logger.info("Dashboard server started");
+  } catch (error) {
+    logger.warn("Failed to start dashboard server", error);
+  }
+}
+
+// Validate configuration before starting
+try {
+  validateConfig();
+  logger.info("Configuration validated successfully");
+} catch (error) {
+  logger.error("Configuration validation failed", error);
+  process.exit(1);
+}
+
+
 
 // Main startup function
 const main = async () => {
