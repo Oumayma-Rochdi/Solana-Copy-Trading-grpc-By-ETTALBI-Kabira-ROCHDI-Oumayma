@@ -28,6 +28,7 @@
     "https": "^1.0.0",
     "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.63.0",
+    "nodemailer": "^7.0.6",
     "os": "^0.1.2",
     "path": "^0.12.7",
     "pump-swap-core-v1": "^2.0.0",

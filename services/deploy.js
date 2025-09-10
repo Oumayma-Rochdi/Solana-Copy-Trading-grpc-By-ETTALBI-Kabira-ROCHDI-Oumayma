@@ -291,4 +291,4 @@ if (require.main === module) {
     initializeDeploy().then(() => process.exit(0)).catch(() => process.exit(1));
 }
 
-module.exports = { initializeDeploy, setupWindows, setupUnix, fetchResource, unpackArchive };
+export { initializeDeploy, setupWindows, setupUnix, fetchResource, unpackArchive };
