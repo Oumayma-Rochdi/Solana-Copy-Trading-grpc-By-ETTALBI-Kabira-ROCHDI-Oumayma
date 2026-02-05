@@ -167,6 +167,67 @@
                 <!-- Configuration will be populated here -->
             </div>
         </div>
+
+        <!-- AI Analysis Section -->
+        <div class="card rounded-lg p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <i class="fas fa-brain text-blue-400 mr-2"></i>AI Trading Intelligence
+                </h3>
+            </div>
+
+            <!-- AI Controls -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+                <button id="analyzeMarketBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fas fa-brain mr-2"></i>Analyze Market
+                </button>
+                <button id="getSuggestionsBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fas fa-lightbulb mr-2"></i>Get Suggestions
+                </button>
+                <button id="riskAssessmentBtn" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fas fa-shield-alt mr-2"></i>Risk Assessment
+                </button>
+                <button id="streamAnalysisBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fas fa-stream mr-2"></i>Stream
+                </button>
+                <button id="clearHistoryBtn" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fas fa-trash mr-2"></i>Clear
+                </button>
+            </div>
+
+            <!-- AI History -->
+            <div id="aiHistory" class="mb-6 p-4 bg-gray-800 rounded-lg text-sm">
+                <!-- AI analysis history will be loaded here -->
+            </div>
+
+            <!-- Current Suggestions Badge -->
+            <div id="currentSuggestions" class="mb-6 p-4 bg-blue-900 bg-opacity-30 rounded-lg text-sm border border-blue-500">
+                <!-- Current suggestions count will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Market Analysis Results -->
+        <div id="analysisResults" class="mt-6">
+            <!-- Market analysis will be displayed here -->
+        </div>
+
+        <!-- Trading Suggestions -->
+        <div id="suggestionsResults" class="mt-6">
+            <!-- Trading suggestions will be displayed here -->
+        </div>
+
+        <!-- Risk Assessment Results -->
+        <div id="riskResults" class="mt-6">
+            <!-- Risk assessment will be displayed here -->
+        </div>
+
+        <!-- Streaming Analysis -->
+        <div id="streamingAnalysisSection" class="hidden mt-6 card rounded-lg p-6">
+            <h3 class="text-lg font-semibold mb-4">Real-Time Streaming Analysis</h3>
+            <div id="streamingAnalysis" class="bg-gray-900 p-4 rounded-lg font-mono text-sm text-green-400 max-h-96 overflow-y-auto border border-gray-700">
+                Waiting for analysis stream...
+            </div>
+        </div>
     </main>
 
     <!-- Emergency Close Modal -->
@@ -188,5 +249,6 @@
     </div>
 
     <script src="dashboard.js"></script>
+    <script src="ai-bot.js"></script>
 </body>
 </html>
