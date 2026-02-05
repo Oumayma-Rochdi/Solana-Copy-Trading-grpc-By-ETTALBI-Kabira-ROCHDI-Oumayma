@@ -6,19 +6,9 @@
     "auditLog": "logs\\.a961c1e9547c0e8ccd2f7b24907043cafbaced36-audit.json",
     "files": [
         {
-            "date": 1765284216793,
-            "name": "logs\\trading-bot-error-2025-12-09.log",
-            "hash": "6156355cc8bf84c71e4bcf086620db9a82aa97297b8b4b44e11c2c2e302a733c"
-        },
-        {
-            "date": 1765908997707,
-            "name": "logs\\trading-bot-error-2025-12-16.log",
-            "hash": "454246c0e78786f2a7e781ce4089313f3ed03ac3d1be5bf7fce6206c47841d21"
-        },
-        {
-            "date": 1767448780021,
-            "name": "logs\\trading-bot-error-2026-01-03.log",
-            "hash": "a0be07f911e6f38d8b4106f292c2a1fe9c657fab376cd56768c3da68c6642356"
+            "date": 1770300953519,
+            "name": "logs\\trading-bot-error-2026-02-05.log",
+            "hash": "bcb6abda889d65c155923a3335f06766c34970c358749507ff80bbd66973c9f4"
         }
     ],
     "hashType": "sha256"

@@ -5,6 +5,7 @@
 
 import aiAnalysis from '../services/aiAnalysis.js'
 import aiPersistence from '../services/aiPersistence.js'
+import 'dotenv/config'
 import logger from '../utils/logger.js'
 
 // Test configuration

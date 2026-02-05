@@ -335,6 +335,12 @@ class RiskManager {
     return results;
   }
 
+  // Get total exposure across all positions
+  getTotalExposure() {
+    const positions = this.getActivePositions();
+    return positions.reduce((sum, pos) => sum + pos.currentValue, 0);
+  }
+
   // Get risk metrics
   getRiskMetrics() {
     const dailyStats = this.getDailyStats();

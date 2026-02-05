@@ -1,24 +1,35 @@
+-- =========================================
 -- AI Analysis History Tables for Trading Bot
+-- PostgreSQL / Neon compatible
+-- =========================================
 
--- Create AI Analyses table
+-- =========================
+-- AI Analyses
+-- =========================
 CREATE TABLE IF NOT EXISTS ai_analyses (
     id SERIAL PRIMARY KEY,
-    analysis_type VARCHAR(50) NOT NULL, -- market_analysis, trading_suggestions, token_analysis, risk_assessment
+    analysis_type VARCHAR(50) NOT NULL,
     input_data JSONB NOT NULL,
     output_data JSONB NOT NULL,
     raw_response TEXT,
     confidence FLOAT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_analysis_type (analysis_type),
-    INDEX idx_created_at (created_at)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create Trading Suggestions table
+CREATE INDEX IF NOT EXISTS idx_ai_analyses_analysis_type
+ON ai_analyses (analysis_type);
+
+CREATE INDEX IF NOT EXISTS idx_ai_analyses_created_at
+ON ai_analyses (created_at);
+
+-- =========================
+-- Trading Suggestions
+-- =========================
 CREATE TABLE IF NOT EXISTS ai_trading_suggestions (
     id SERIAL PRIMARY KEY,
-    analysis_id INTEGER REFERENCES ai_analyses(id),
-    action VARCHAR(20) NOT NULL, -- BUY, SELL, HOLD
+    analysis_id INTEGER REFERENCES ai_analyses(id) ON DELETE CASCADE,
+    action VARCHAR(20) NOT NULL,
     symbol VARCHAR(100),
     entry_price DECIMAL(20, 8),
     target_price DECIMAL(20, 8),
@@ -26,14 +37,20 @@ CREATE TABLE IF NOT EXISTS ai_trading_suggestions (
     risk_reward_ratio FLOAT,
     confidence FLOAT,
     reasoning TEXT,
-    status VARCHAR(20) DEFAULT 'pending', -- pending, executed, closed
+    status VARCHAR(20) DEFAULT 'pending',
     executed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_status (status),
-    INDEX idx_created_at (created_at)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create Risk Assessments table
+CREATE INDEX IF NOT EXISTS idx_ai_trading_suggestions_status
+ON ai_trading_suggestions (status);
+
+CREATE INDEX IF NOT EXISTS idx_ai_trading_suggestions_created_at
+ON ai_trading_suggestions (created_at);
+
+-- =========================
+-- Risk Assessments
+-- =========================
 CREATE TABLE IF NOT EXISTS ai_risk_assessments (
     id SERIAL PRIMARY KEY,
     risk_score INTEGER NOT NULL,
@@ -42,12 +59,18 @@ CREATE TABLE IF NOT EXISTS ai_risk_assessments (
     recommended_actions JSONB NOT NULL,
     portfolio_exposure DECIMAL(20, 8),
     portfolio_size INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_risk_score (risk_score),
-    INDEX idx_created_at (created_at)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create Token Analyses table
+CREATE INDEX IF NOT EXISTS idx_ai_risk_assessments_risk_score
+ON ai_risk_assessments (risk_score);
+
+CREATE INDEX IF NOT EXISTS idx_ai_risk_assessments_created_at
+ON ai_risk_assessments (created_at);
+
+-- =========================
+-- Token Analyses
+-- =========================
 CREATE TABLE IF NOT EXISTS ai_token_analyses (
     id SERIAL PRIMARY KEY,
     token_mint VARCHAR(100) NOT NULL UNIQUE,
@@ -56,17 +79,23 @@ CREATE TABLE IF NOT EXISTS ai_token_analyses (
     fundamentals_score FLOAT,
     tokenomics_score FLOAT,
     risk_factors JSONB NOT NULL,
-    investment_potential VARCHAR(20), -- HIGH, MEDIUM, LOW
-    recommendation VARCHAR(20), -- BUY, HOLD, AVOID
+    investment_potential VARCHAR(20),
+    recommendation VARCHAR(20),
     confidence FLOAT,
     rationale TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_token_mint (token_mint),
-    INDEX idx_recommendation (recommendation)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create AI Analysis Performance Metrics table
+CREATE INDEX IF NOT EXISTS idx_ai_token_analyses_token_mint
+ON ai_token_analyses (token_mint);
+
+CREATE INDEX IF NOT EXISTS idx_ai_token_analyses_recommendation
+ON ai_token_analyses (recommendation);
+
+-- =========================
+-- Analysis Metrics
+-- =========================
 CREATE TABLE IF NOT EXISTS ai_analysis_metrics (
     id SERIAL PRIMARY KEY,
     analysis_type VARCHAR(50) NOT NULL,
@@ -76,11 +105,15 @@ CREATE TABLE IF NOT EXISTS ai_analysis_metrics (
     profitable_suggestions INTEGER DEFAULT 0,
     loss_suggestions INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_analysis_type (analysis_type)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create AI Model Usage Log table
+CREATE INDEX IF NOT EXISTS idx_ai_analysis_metrics_analysis_type
+ON ai_analysis_metrics (analysis_type);
+
+-- =========================
+-- Model Usage Logs
+-- =========================
 CREATE TABLE IF NOT EXISTS ai_model_usage (
     id SERIAL PRIMARY KEY,
     model_name VARCHAR(100),
@@ -90,23 +123,33 @@ CREATE TABLE IF NOT EXISTS ai_model_usage (
     response_time_ms INTEGER,
     success BOOLEAN DEFAULT true,
     error_message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_model_name (model_name),
-    INDEX idx_created_at (created_at)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create Trading Results from AI Suggestions table
+CREATE INDEX IF NOT EXISTS idx_ai_model_usage_model_name
+ON ai_model_usage (model_name);
+
+CREATE INDEX IF NOT EXISTS idx_ai_model_usage_created_at
+ON ai_model_usage (created_at);
+
+-- =========================
+-- Trading Results
+-- =========================
 CREATE TABLE IF NOT EXISTS ai_suggestion_results (
     id SERIAL PRIMARY KEY,
-    suggestion_id INTEGER REFERENCES ai_trading_suggestions(id),
+    suggestion_id INTEGER REFERENCES ai_trading_suggestions(id) ON DELETE CASCADE,
     entry_price DECIMAL(20, 8),
     exit_price DECIMAL(20, 8),
     pnl DECIMAL(20, 8),
     pnl_percentage FLOAT,
     hold_duration_seconds INTEGER,
-    result_type VARCHAR(20), -- WIN, LOSS, PARTIAL
+    result_type VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    closed_at TIMESTAMP,
-    INDEX idx_result_type (result_type),
-    INDEX idx_created_at (created_at)
+    closed_at TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_ai_suggestion_results_result_type
+ON ai_suggestion_results (result_type);
+
+CREATE INDEX IF NOT EXISTS idx_ai_suggestion_results_created_at
+ON ai_suggestion_results (created_at);
