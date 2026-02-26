@@ -2,7 +2,7 @@
 
 ## Vue d'Ensemble
 
-Un **bot intelligent d'analyse IA** a été intégré à votre système de trading Solana Copy Trading gRPC. Ce bot utilise Claude Opus 4.5 (via Vercel AI Gateway) pour fournir une analyse de marché en temps réel, des suggestions de trading, une analyse de tokens et une évaluation des risques.
+Un **bot intelligent d'analyse IA** a été intégré à votre système de trading Solana Copy Trading gRPC. Ce bot utilise gpt-4o-mini (via OpenAI API) pour fournir une analyse de marché en temps réel, des suggestions de trading, une analyse de tokens et une évaluation des risques.
 
 ## Composants Implémentés
 
@@ -87,7 +87,7 @@ Tests:
 ## Architecture Technique
 
 ### Stack Technologique
-- **AI Model**: Claude Opus 4.5 (Vercel AI Gateway)
+- **AI Model**: gpt-4o-mini (OpenAI API)
 - **Backend**: Node.js + Express.js
 - **Database**: Neon PostgreSQL
 - **Frontend**: Vanilla JavaScript + Chart.js
@@ -102,7 +102,7 @@ API Endpoints
     ↓
 AI Analysis Service
     ↓
-Vercel AI Gateway (Claude)
+OpenAI API (OpenAI)
     ↓
 Response Processing
     ↓
@@ -350,3 +350,4 @@ Le système est **production-ready**, **scalable**, et **bien documenté**. Prê
 **Date d'Implémentation**: 2026-02-05
 **Version**: 1.0
 **Statut**: ✓ Complet
+

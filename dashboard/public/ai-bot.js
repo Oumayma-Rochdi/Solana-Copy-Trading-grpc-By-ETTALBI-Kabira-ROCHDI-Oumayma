@@ -33,6 +33,12 @@ class AITradingBot {
       riskAssessmentBtn.addEventListener('click', () => this.getRiskAssessment());
     }
 
+    // Decision engine button
+    const decisionBtn = document.getElementById('decisionBtn');
+    if (decisionBtn) {
+      decisionBtn.addEventListener('click', () => this.getDecision());
+    }
+
     // Clear history button
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     if (clearHistoryBtn) {

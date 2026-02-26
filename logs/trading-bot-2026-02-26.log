@@ -1,0 +1,3 @@
+{"level":"info","message":"Dashboard server started on port 3000","service":"solana-trading-bot","timestamp":"2026-02-26T10:53:43.727Z"}
+{"level":"info","message":"Dashboard available at: http://localhost:3000","service":"solana-trading-bot","timestamp":"2026-02-26T10:53:43.748Z"}
+{"level":"info","message":"[AI-Analysis] Starting market condition analysis","service":"solana-trading-bot","timestamp":"2026-02-26T11:19:01.707Z"}

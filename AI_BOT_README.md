@@ -2,7 +2,7 @@
 
 ## 🤖 Qu'est-ce que c'est?
 
-Votre bot de trading Solana est maintenant équipé d'un **agent intelligent d'analyse IA** qui utilise Claude Opus 4.5 pour:
+Votre bot de trading Solana est maintenant équipé d'un **agent intelligent d'analyse IA** qui utilise gpt-4o-mini pour:
 
 - Analyser les conditions du marché en temps réel
 - Générer des suggestions de trading intelligentes
@@ -16,7 +16,7 @@ Votre bot de trading Solana est maintenant équipé d'un **agent intelligent d'a
 ```
 Entrée: Données de marché (prix, sentiment, volatilité)
 ↓
-Analyse IA (Claude Opus 4.5)
+Analyse IA (gpt-4o-mini)
 ↓
 Sortie: Sentiment, niveaux clés, facteurs de risque
 ```
@@ -345,7 +345,7 @@ psql -d $DATABASE_URL -c "\dt ai_*"
 ```
 
 ### AI API Not Responding
-- Vérifier Vercel AI Gateway access (automatique sur Vercel)
+- Vérifier OpenAI API access (automatique sur Vercel)
 - Vérifier les logs: `vercel logs --follow`
 - Vérifier le rate limiting
 
@@ -432,3 +432,4 @@ Vous pouvez maintenant:
 **Status**: Production Ready ✓
 
 Pour toute question, consultez la documentation ou exécutez les tests.
+

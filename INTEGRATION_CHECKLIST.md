@@ -5,7 +5,7 @@
 ### Phase 1: Core Services ✓
 
 - [x] **Service d'Analyse IA** (`services/aiAnalysis.js`)
-  - [x] Analyse de marché avec Claude
+  - [x] Analyse de marché avec OpenAI
   - [x] Génération de suggestions de trading
   - [x] Analyse de tokens
   - [x] Évaluation des risques
@@ -152,7 +152,7 @@
 
 ## 🛠️ Technologies Utilisées
 
-- [x] **AI/ML**: Claude Opus 4.5 via Vercel AI Gateway
+- [x] **AI/ML**: gpt-4o-mini via OpenAI API
 - [x] **Backend**: Node.js, Express.js
 - [x] **Database**: PostgreSQL (Neon)
 - [x] **Frontend**: Vanilla JavaScript, Chart.js
@@ -291,3 +291,4 @@ Vous pouvez maintenant:
 Statut: **✅ COMPLETE**
 Date: **2026-02-05**
 Version: **1.0.0**
+

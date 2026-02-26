@@ -217,3 +217,4 @@ console.log('Risk Score:', assessment.riskScore);
 - [ ] Tests passants
 
 **Enjoy! 🚀**
+
