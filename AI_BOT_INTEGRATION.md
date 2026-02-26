@@ -2,7 +2,7 @@
 
 ## What Was Added
 
-Your Solana Copy Trading bot now has a complete **Intelligent AI Trading Bot** powered by Claude AI. This bot provides advanced market analysis, trading suggestions, and risk management capabilities.
+Your Solana Copy Trading bot now has a complete **Intelligent AI Trading Bot** powered by OpenAI. This bot provides advanced market analysis, trading suggestions, and risk management capabilities.
 
 ## Features Implemented
 
@@ -72,8 +72,8 @@ Complete REST API for AI operations:
       └─────────────────────┘    │  • ai_token_analyses │
               ↓                    │  • ai_metrics        │
       ┌─────────────────────┐    └──────────────────────┘
-      │  Vercel AI Gateway  │
-      │  (Claude Opus 4.5)  │
+      │  OpenAI API  │
+      │  (gpt-4o-mini)  │
       └─────────────────────┘
 ```
 
@@ -105,7 +105,7 @@ docs/
 
 ## Key Technologies
 
-- **AI Model**: Claude Opus 4.5 (via Vercel AI Gateway)
+- **AI Model**: gpt-4o-mini (via OpenAI API)
 - **Streaming**: Real-time updates via Server-Sent Events
 - **Database**: Neon PostgreSQL with connection pooling
 - **Frontend**: Vanilla JavaScript + Chart.js for visualizations
@@ -252,7 +252,7 @@ Monitor these log messages:
 - Ensure network connectivity
 
 ### AI API Errors
-- Verify Vercel AI Gateway access (automatic on Vercel)
+- Verify `OPENAI_API_KEY` is set
 - Check for API rate limiting
 - Review error message in logs
 
@@ -329,3 +329,4 @@ Your trading bot now has intelligent AI capabilities! The system is:
 - **Production-ready**: Error handling and database pooling
 
 Happy trading! 🚀
+

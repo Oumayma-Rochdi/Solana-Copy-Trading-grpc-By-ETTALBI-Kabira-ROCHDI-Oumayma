@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide walks you through integrating the intelligent AI trading bot with your Solana Copy Trading gRPC bot. The AI bot provides market analysis, trading suggestions, token analysis, and risk assessment powered by Claude AI via Vercel AI Gateway.
+This guide walks you through integrating the intelligent AI trading bot with your Solana Copy Trading gRPC bot. The AI bot provides market analysis, trading suggestions, token analysis, and risk assessment powered by OpenAI via OpenAI API.
 
 ## Features
 
@@ -17,8 +17,7 @@ This guide walks you through integrating the intelligent AI trading bot with you
 
 - Node.js 16+ installed
 - Neon PostgreSQL database configured (via environment variables)
-- Vercel AI Gateway access (automatic with Vercel deployment)
-- Claude API access (via Vercel AI Gateway)
+- OpenAI API access
 
 ## Installation Steps
 
@@ -44,8 +43,8 @@ Ensure the following environment variables are set:
 # Database Configuration (Neon)
 DATABASE_URL=postgresql://[user]:[password]@[host]/[database]
 
-# Vercel AI Gateway (automatically available on Vercel)
-# No additional setup needed - the AI SDK uses the gateway by default
+# OpenAI API
+OPENAI_API_KEY=your_openai_api_key_here
 
 # Dashboard Configuration
 ENABLE_DASHBOARD=true
@@ -55,7 +54,7 @@ DASHBOARD_PORT=3000
 ### 3. Install Dependencies
 
 ```bash
-npm install ai @ai-sdk/react
+npm install ai @ai-sdk/openai @ai-sdk/react
 ```
 
 These packages are already in your project, but ensure they're installed.
@@ -221,12 +220,12 @@ services/
 
 ## AI Model Configuration
 
-The system uses **Claude Opus 4.5** via Vercel AI Gateway for analysis:
+The system uses **gpt-4o-mini** via OpenAI API for analysis:
 
-- **Model**: `anthropic/claude-opus-4.5`
+- **Model**: `gpt-4o-mini`
 - **Temperature**: 0.2-0.4 (low for consistency)
 - **Max Tokens**: 1000-2000 per request
-- **Provider**: Vercel AI Gateway (zero-config)
+- **Provider**: OpenAI API (zero-config)
 
 ## Performance Considerations
 
@@ -249,11 +248,11 @@ logger.info('[AI-Persistence] Database connection initialized')
 // 3. Database credentials are valid
 ```
 
-### AI Gateway Issues
+### OpenAI API Issues
 
-- Ensure you're deploying on Vercel for automatic API key management
-- Check Vercel project settings for integration status
-- The AI SDK will use the gateway automatically without additional config
+- Ensure `OPENAI_API_KEY` is set in your environment
+- Check for rate limiting or quota issues
+- Review API error messages in logs
 
 ### Dashboard Not Loading
 
@@ -351,3 +350,4 @@ For issues or questions:
 ## License
 
 Same as parent project (Solana Copy Trading gRPC)
+

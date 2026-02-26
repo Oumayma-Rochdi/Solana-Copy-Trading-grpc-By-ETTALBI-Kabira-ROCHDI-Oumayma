@@ -1,4 +1,5 @@
 import { generateText, streamText } from 'ai'
+import { openai } from '@ai-sdk/openai'
 import logger from '../utils/logger.js'
 import riskManager from './riskManager.js'
 import aiPersistence from './aiPersistence.js'
@@ -13,7 +14,7 @@ class AIAnalysisService {
 
   /**
    * Analyze market conditions and provide trading suggestions
-   * Uses Claude as the AI model (accessed via Vercel AI Gateway)
+   * Uses OpenAI as the AI model
    */
   async analyzeMarketConditions(marketData) {
     try {
@@ -41,7 +42,7 @@ Please provide:
 Format your response as JSON with these exact keys: marketSentiment, priceAnalysis, suggestions, riskLevel, recommendations`
 
       const result = await generateText({
-        model: 'anthropic/claude-opus-4.5', // Using Claude via AI Gateway
+        model: openai('gpt-4o-mini'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: 0.3, // Low temperature for consistent analysis
@@ -105,7 +106,7 @@ Focus on:
 3. Quick action items`
 
       const stream = await streamText({
-        model: 'anthropic/claude-opus-4.5',
+        model: openai('gpt-4o-mini'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: 0.2,
@@ -140,8 +141,9 @@ ${JSON.stringify(marketData, null, 2)}
 Risk Manager Status:
 - Total Exposure: ${riskManager.getTotalExposure()}
 - Position Count: ${currentPositions.length}
-- Daily Loss: ${riskManager.dailyLoss}
-- Daily Profit: ${riskManager.dailyProfit}`
+- Net Daily PnL: ${riskManager.dailyStats.netPnL.toFixed(4)} SOL
+- Total Daily Profit: ${riskManager.dailyStats.totalProfit.toFixed(4)} SOL
+- Total Daily Loss: ${riskManager.dailyStats.totalLoss.toFixed(4)} SOL`
 
       const systemPrompt = `You are a professional trading advisor specializing in Solana tokens.
 Provide actionable trading suggestions considering:
@@ -159,7 +161,7 @@ ${context}
 Return suggestions in JSON format with keys: action, symbol, entryPrice, targetPrice, stopLoss, riskReward, confidence, reasoning`
 
       const result = await generateText({
-        model: 'anthropic/claude-opus-4.5',
+        model: openai('gpt-4o-mini'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: 0.4,
@@ -170,7 +172,7 @@ Return suggestions in JSON format with keys: action, symbol, entryPrice, targetP
 
       // Store suggestions
       this.tradeSuggestions = suggestions
-      
+
       const historyRecord = {
         timestamp: new Date(),
         type: 'trading_suggestions',
@@ -187,7 +189,7 @@ Return suggestions in JSON format with keys: action, symbol, entryPrice, targetP
           rawResponse: result.text,
           confidence: 0.8,
         })
-        
+
         if (savedAnalysis && suggestions.length > 0) {
           await aiPersistence.saveTradingSuggestions(suggestions, savedAnalysis.id)
         }
@@ -241,7 +243,7 @@ Provide analysis covering:
 Format as JSON with keys: fundamentals, tokenomics, risks, potential, recommendation, confidence, rationale`
 
       const result = await generateText({
-        model: 'anthropic/claude-opus-4.5',
+        model: openai('gpt-4o-mini'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: 0.3,
@@ -314,7 +316,7 @@ Provide assessment with:
 Format as JSON with keys: riskScore, factors, positionRisks, mitigation, actions`
 
       const result = await generateText({
-        model: 'anthropic/claude-opus-4.5',
+        model: openai('gpt-4o-mini'),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: 0.2,
