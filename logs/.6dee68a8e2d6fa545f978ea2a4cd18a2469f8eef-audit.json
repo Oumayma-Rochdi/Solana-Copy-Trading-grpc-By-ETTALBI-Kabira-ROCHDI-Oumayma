@@ -9,6 +9,11 @@
             "date": 1772103221435,
             "name": "logs\\trading-bot-2026-02-26.log",
             "hash": "1b22b8683935adb949ccea79efb06e81c7aaa6bb0a04841219bdda1d739e3c6c"
+        },
+        {
+            "date": 1772190094453,
+            "name": "logs\\trading-bot-2026-02-27.log",
+            "hash": "87714ca5bf4842606d2aabd0fc5ddea4e080b76f22f9c9b462f986689114f34b"
         }
     ],
     "hashType": "sha256"

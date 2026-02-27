@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Bot Real-time Monitor</title>
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <!-- TailwindCSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-base: #030712;
+            /* Very dark background */
+            --surface: #111827;
+            /* Slightly lighter */
+            --primary: #3b82f6;
+            /* Blue */
+            --success: #10b981;
+            /* Emerald */
+            --danger: #ef4444;
+            /* Red */
+            --warning: #fbbf24;
+            /* Amber */
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(17, 24, 39, 0.6);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-base);
+            color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            background-image:
+                radial-gradient(circle at top left, rgba(59, 130, 246, 0.1), transparent 40%),
+                radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.05), transparent 40%);
+            min-height: 100vh;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+        }
+
+        .glass-card {
+            background: rgba(31, 41, 55, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-2px);
+            background: rgba(31, 41, 55, 0.6);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Status Colors */
+        .status-active {
+            color: var(--success);
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .status-idle {
+            color: var(--warning);
+            text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+        }
+
+        .status-error {
+            color: var(--danger);
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+
+        /* Tables */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th {
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            color: #9ca3af;
+            padding: 1rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 1rem;
+            color: #d1d5db;
+            font-size: 0.875rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Floating animations for dashboard elements */
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-3px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        .stat-card:hover .icon-container {
+            animation: float 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-8">
+
+    <!-- Top Navigation & Control Bar -->
+    <header
+        class="max-w-7xl mx-auto glass-panel p-4 px-6 flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+        <div class="flex items-center gap-4">
+            <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-robot text-white text-xl"></i>
+            </div>
+            <div>
+                <h1
+                    class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">
+                    System Monitor <span class="text-sm font-medium text-gray-400">v2.0</span></h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span id="botStatus" class="font-bold status-idle text-xs uppercase tracking-wider"><i
+                            class="fas fa-circle mr-1 text-[10px]"></i>Connecting...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <a href="index.html"
+                class="glass-card px-4 py-2 flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors">
+                <i class="fas fa-brain text-purple-400"></i> AI Engine
+            </a>
+            <button id="refreshBtn"
+                class="glass-card px-4 py-2 flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors">
+                <i class="fas fa-sync-alt"></i> Refresh Data
+            </button>
+            <button id="emergencyCloseBtn"
+                class="bg-red-500/10 border border-red-500/50 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors">
+                <i class="fas fa-power-off"></i> EMERGENCY CLOSE
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
+
+        <!-- Risk Metrics Quick View -->
+        <div class="md:col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-2">
+
+            <div class="glass-panel p-6 stat-card relative overflow-hidden group">
+                <div
+                    class="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition-all">
+                </div>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs text-gray-400 font-semibold tracking-wider uppercase mb-1">Active Positions
+                        </p>
+                        <h3 class="text-3xl font-bold text-white mono" id="activePositions">0</h3>
+                    </div>
+                    <div
+                        class="icon-container w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
+                        <i class="fas fa-briefcase"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel p-6 stat-card relative overflow-hidden group">
+                <div
+                    class="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition-all">
+                </div>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs text-gray-400 font-semibold tracking-wider uppercase mb-1">Net Daily PnL</p>
+                        <h3 class="text-3xl font-bold text-emerald-400 mono" id="dailyPnL">0.00 SOL</h3>
+                    </div>
+                    <div
+                        class="icon-container w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel p-6 stat-card relative overflow-hidden group">
+                <div
+                    class="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full blur-xl group-hover:bg-purple-500/20 transition-all">
+                </div>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs text-gray-400 font-semibold tracking-wider uppercase mb-1">Win Rate</p>
+                        <h3 class="text-3xl font-bold text-white mono" id="winRate">0.0%</h3>
+                    </div>
+                    <div
+                        class="icon-container w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel p-6 stat-card relative overflow-hidden group">
+                <div
+                    class="absolute -right-6 -top-6 w-24 h-24 bg-red-500/10 rounded-full blur-xl group-hover:bg-red-500/20 transition-all">
+                </div>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs text-gray-400 font-semibold tracking-wider uppercase mb-1">Risk Level</p>
+                        <h3 class="text-2xl font-bold text-white uppercase tracking-wide mt-1" id="riskLevel">
+                            Analyzing...</h3>
+                    </div>
+                    <div
+                        class="icon-container w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Charts Row -->
+        <div class="md:col-span-8 glass-panel p-6 flex flex-col min-h-[400px]">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold flex items-center gap-2"><i
+                        class="fas fa-chart-area text-blue-400"></i> PnL Trend (24h)</h3>
+            </div>
+            <div class="flex-1 w-full relative">
+                <canvas id="pnlChart"></canvas>
+            </div>
+        </div>
+
+        <div class="md:col-span-4 glass-panel p-6 flex flex-col min-h-[400px]">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold flex items-center gap-2"><i
+                        class="fas fa-chart-pie text-purple-400"></i> Active Positions</h3>
+            </div>
+            <div class="flex-1 w-full relative flex items-center justify-center">
+                <canvas id="positionsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Data Tables Row -->
+        <div class="md:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Positons Manager Grid -->
+            <div class="glass-panel p-6">
+                <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <i class="fas fa-list-ul text-emerald-400"></i> Live Position Management
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-800/30">
+                                <th class="rounded-tl-lg">Token Route</th>
+                                <th>Entry</th>
+                                <th>Current</th>
+                                <th>Unrealized PnL</th>
+                                <th>Duration</th>
+                                <th class="rounded-tr-lg">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center p-6 text-gray-500 italic">Waiting for position
+                                    data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Historical Trades Grid -->
+            <div class="glass-panel p-6">
+                <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <i class="fas fa-history text-blue-400"></i> Executed Trades History
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-800/30">
+                                <th class="rounded-tl-lg">Timestamp</th>
+                                <th>Type</th>
+                                <th>Token</th>
+                                <th>Size</th>
+                                <th>Price</th>
+                                <th class="rounded-tr-lg">PnL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center p-6 text-gray-500 italic">Waiting for history dump...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Configuration Settings Section -->
+        <div class="md:col-span-12 glass-panel p-6">
+            <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                <i class="fas fa-sliders-h text-yellow-400"></i> Bot Configuration Profile
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4" id="configGrid">
+                <!-- Data injected via JS -->
+                <div class="col-span-full p-4 text-center text-gray-500 italic">Awaiting config parameters...</div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Emergency Modal -->
+    <div id="emergencyModal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-[100] opacity-100 transition-opacity">
+        <div
+            class="bg-gray-900 border border-red-500/50 p-8 rounded-2xl max-w-md w-full mx-4 shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+            <div class="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-exclamation-triangle text-red-500 text-4xl animate-pulse"></i>
+            </div>
+            <h3 class="text-3xl font-black text-center text-white mb-2">EMERGENCY STOP</h3>
+            <p class="text-gray-400 text-center text-sm mb-8 leading-relaxed">
+                This will immediately broadcast market sell orders for <strong>ALL</strong> currently active positions
+                regardless of their PnL status and pause further operations.
+            </p>
+            <div class="flex gap-4">
+                <button id="cancelEmergencyClose"
+                    class="flex-1 bg-gray-800 hover:bg-gray-700 py-3 rounded-xl font-semibold text-white transition-colors">Abort</button>
+                <button id="confirmEmergencyClose"
+                    class="flex-1 bg-red-600 hover:bg-red-500 shadow-lg shadow-red-600/30 py-3 rounded-xl font-bold text-white transition-all transform hover:scale-105 active:scale-95">Liquidate
+                    All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integrate JS -->
+    <script src="dashboard.js"></script>
+</body>
+
+</html>
