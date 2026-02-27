@@ -9,6 +9,7 @@ logs/
 *.sqlite
 *.sqlite-journal
 *.db
+data/market_dataset.csv
 
 # ML Model & Python temp files
 __pycache__/
