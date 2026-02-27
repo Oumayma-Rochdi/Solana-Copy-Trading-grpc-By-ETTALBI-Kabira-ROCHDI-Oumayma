@@ -69,17 +69,9 @@ class AITradingBot {
     if (btn) btn.classList.add('loading');
 
     try {
-      // Get current market data (you would replace with real data)
-      const marketData = {
-        btcPrice: 42500,
-        ethPrice: 2250,
-        solPrice: 150,
-        sentiment: 'bullish',
-        volatility: 'high',
-        fearGreedIndex: 65,
-        volume24h: 1000000,
-        activePositions: this.getActivePositions(),
-      };
+      // Fetch latest market data from our new endpoint
+      const marketRes = await fetch('/api/market-data');
+      const marketData = await marketRes.json();
 
       const response = await fetch('/api/ai/analyze-market', {
         method: 'POST',
@@ -113,15 +105,9 @@ class AITradingBot {
     if (btn) btn.classList.add('loading');
 
     try {
-      const marketData = {
-        btcPrice: 42500,
-        ethPrice: 2250,
-        solPrice: 150,
-        sentiment: 'bullish',
-        volatility: 'high',
-        fearGreedIndex: 65,
-        volume24h: 1000000,
-      };
+      // Fetch latest market data from our new endpoint
+      const marketRes = await fetch('/api/market-data');
+      const marketData = await marketRes.json();
 
       const response = await fetch('/api/ai/suggestions', {
         method: 'POST',
@@ -192,14 +178,9 @@ class AITradingBot {
     }
 
     try {
-      const marketData = {
-        btcPrice: 42500,
-        ethPrice: 2250,
-        solPrice: 150,
-        sentiment: 'bullish',
-        volatility: 'high',
-        fearGreedIndex: 65,
-      };
+      // Fetch latest market data from our new endpoint
+      const marketRes = await fetch('/api/market-data');
+      const marketData = await marketRes.json();
 
       const response = await fetch('/api/ai/analyze-market-stream', {
         method: 'POST',

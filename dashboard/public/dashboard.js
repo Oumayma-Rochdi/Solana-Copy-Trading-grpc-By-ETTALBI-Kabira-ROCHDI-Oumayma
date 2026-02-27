@@ -106,6 +106,7 @@ class TradingBotDashboard {
         try {
             await Promise.all([
                 this.loadStatus(),
+                this.loadMarketData(),
                 this.loadRiskMetrics(),
                 this.loadPositions(),
                 this.loadHistory(),
@@ -136,6 +137,7 @@ class TradingBotDashboard {
         // Refresh data every 30 seconds
         this.refreshInterval = setInterval(() => {
             this.loadStatus();
+            this.loadMarketData();
             this.loadRiskMetrics();
             this.loadPositions();
         }, 30000);
@@ -155,6 +157,25 @@ class TradingBotDashboard {
             
         } catch (error) {
             console.error('Error loading status:', error);
+        }
+    }
+
+    async loadMarketData() {
+        try {
+            const response = await fetch('/api/market-data');
+            const data = await response.json();
+            
+            if (document.getElementById('solPrice')) {
+                document.getElementById('solPrice').textContent = `$${data.solPrice.toFixed(2)}`;
+                document.getElementById('solChange').textContent = `${data.momentum > 0 ? '+' : ''}${data.momentum.toFixed(2)}%`;
+                document.getElementById('solChange').className = `text-xs font-bold ${data.momentum >= 0 ? 'text-green-400' : 'text-red-400'}`;
+                
+                document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
+                document.getElementById('ethPrice').textContent = `$${data.ethPrice.toLocaleString()}`;
+                document.getElementById('solVolume').textContent = `$${(data.volume24h / 1000000).toFixed(1)}M`;
+            }
+        } catch (error) {
+            console.error('Error loading market data:', error);
         }
     }
 

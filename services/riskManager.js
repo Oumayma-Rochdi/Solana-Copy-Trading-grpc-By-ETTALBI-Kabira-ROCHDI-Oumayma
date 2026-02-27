@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import logger from '../utils/logger.js';
 import notificationService from './notifications.js';
+import binanceService from './binanceService.js';
 
 class RiskManager {
   constructor() {
@@ -342,24 +343,36 @@ class RiskManager {
   }
 
   // Get risk metrics
-  getRiskMetrics() {
+  async getRiskMetrics() {
     const dailyStats = this.getDailyStats();
     const positionSummary = this.getPositionSummary();
     
     return {
       dailyStats,
       positionSummary,
-      riskLevel: this.calculateRiskLevel(),
+      riskLevel: await this.calculateRiskLevel(),
       recommendations: this.getRiskRecommendations(),
     };
   }
 
   // Calculate overall risk level
-  calculateRiskLevel() {
+  async calculateRiskLevel() {
     const dailyStats = this.getDailyStats();
     const positionSummary = this.getPositionSummary();
     
     let riskScore = 0;
+    
+    // Market Volatility (Binance Integration)
+    try {
+      const marketData = await binanceService.getAggregatedMarketData();
+      if (marketData.volatility > 5) {
+        riskScore += 20; // High market volatility
+      } else if (marketData.volatility > 3) {
+        riskScore += 10; // Moderate market volatility
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch volatility for risk score', error);
+    }
     
     // Daily loss proximity
     if (dailyStats.netPnL <= -config.risk.maxDailyLoss * 0.9) {

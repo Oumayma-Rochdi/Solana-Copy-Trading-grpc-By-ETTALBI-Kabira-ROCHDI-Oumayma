@@ -19,7 +19,11 @@ const requiredEnvVars = [
 
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
-    throw new Error(`Missing required environment variable: ${envVar}`);
+    if (envVar.startsWith('GRPC')) {
+      console.warn(`\x1b[33mWarning: Missing environment variable: ${envVar}. Real-time launch monitoring will be disabled.\x1b[0m`);
+    } else {
+      throw new Error(`Missing required environment variable: ${envVar}`);
+    }
   }
 }
 

@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai'
 import logger from '../utils/logger.js'
 import riskManager from './riskManager.js'
 import aiPersistence from './aiPersistence.js'
+import binanceService from './binanceService.js'
 
 // AI Analysis Service
 class AIAnalysisService {
@@ -21,7 +22,8 @@ class AIAnalysisService {
       logger.info('[AI-Analysis] Starting market condition analysis')
 
       // Build context from current market data
-      const context = this._buildAnalysisContext(marketData)
+      const data = marketData || await binanceService.getAggregatedMarketData();
+      const context = this._buildAnalysisContext(data)
 
       const systemPrompt = `You are an expert cryptocurrency trading analyst with deep knowledge of Solana and token trading strategies. 
 You analyze market conditions, identify trading opportunities, and provide actionable recommendations based on risk management principles.
@@ -90,7 +92,8 @@ Format your response as JSON with these exact keys: marketSentiment, priceAnalys
     try {
       logger.info('[AI-Analysis] Starting streaming market analysis')
 
-      const context = this._buildAnalysisContext(marketData)
+      const data = marketData || await binanceService.getAggregatedMarketData();
+      const context = this._buildAnalysisContext(data)
 
       const systemPrompt = `You are a real-time trading analyst providing instant market insights.
 Provide concise, actionable analysis focusing on immediate opportunities and risks.
@@ -131,12 +134,14 @@ Focus on:
     try {
       logger.info('[AI-Analysis] Generating trading suggestions')
 
+      const data = marketData || await binanceService.getAggregatedMarketData();
+
       const context = `
 Current Active Positions:
 ${JSON.stringify(currentPositions, null, 2)}
 
 Market Data:
-${JSON.stringify(marketData, null, 2)}
+${JSON.stringify(data, null, 2)}
 
 Risk Manager Status:
 - Total Exposure: ${riskManager.getTotalExposure()}
