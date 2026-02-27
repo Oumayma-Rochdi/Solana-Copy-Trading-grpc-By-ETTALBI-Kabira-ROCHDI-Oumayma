@@ -13,13 +13,20 @@ const GRPC_ENDPOINT = process.env.GRPC_ENDPOINT
 
 // Pre-define constants
 const SOLANA_TOKEN = "So11111111111111111111111111111111111111112";
-const RAYDIUM_FEE = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"//"7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eqaYcHQqtj2G5";
-const Raydium_launchpad_authority = "WLHv2UAZm6z4KyaaELi5pjdbJh6RESMva1Rnn8pJVVh"
-// Create default client
-const defaultClient = new Client(
-  GRPC_ENDPOINT,
-  GRPCTOKEN
-);
+const RAYDIUM_FEE = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj";
+const Raydium_launchpad_authority = "WLHv2UAZm6z4KyaaELi5pjdbJh6RESMva1Rnn8pJVVh";
+
+// Create default client safely
+let defaultClient = null;
+if (GRPC_ENDPOINT && GRPCTOKEN) {
+  try {
+    defaultClient = new Client(GRPC_ENDPOINT, GRPCTOKEN);
+  } catch (error) {
+    console.error(chalk.red("Failed to initialize gRPC client:"), error.message);
+  }
+} else {
+  console.warn(chalk.yellow("gRPC credentials missing. Real-time launch monitoring will be disabled."));
+}
 
 export let isNewLaunchRunning = true;
 export const stopNewLaunch = () => {
@@ -71,6 +78,10 @@ async function checkMintTo(data) {
 
 
 async function handleStream(client = defaultClient, args = defaultArgs) {
+  if (!client) {
+    console.error(chalk.red("Cannot handle stream: gRPC client is null"));
+    return;
+  }
   const stream = await client.subscribe(args);
 
   const streamClosed = new Promise((resolve, reject) => {
@@ -184,14 +195,22 @@ export async function newlunched_subscribeCommand(client = defaultClient, args =
   isNewLaunchRunning = true;
   console.log(chalk.green("New launch monitoring started"));
 
+  let backoffDelay = 1000;
+  const maxBackoff = 60000; // 1 minute max
+
   while (isNewLaunchRunning) {
     try {
       await handleStream(client, args);
+      // Reset backoff on successful connection
+      backoffDelay = 1000;
     } catch (error) {
-      console.error("Stream error, restarting in 1 second...", error);
+      console.error(chalk.red(`Stream error, restarting in ${backoffDelay / 1000}s...`), error.message || error);
+      
       // Only wait and retry if monitoring is still enabled
       if (isNewLaunchRunning) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+        // Exponentially increase delay
+        backoffDelay = Math.min(backoffDelay * 2, maxBackoff);
       }
     }
   }

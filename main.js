@@ -139,7 +139,7 @@ async function monitorPositions() {
 // Monitor risk metrics
 async function monitorRisk() {
   try {
-    const riskMetrics = riskManager.getRiskMetrics();
+    const riskMetrics = await riskManager.getRiskMetrics();
 
     // Log risk metrics periodically
     if (riskMetrics.riskLevel === 'HIGH') {
