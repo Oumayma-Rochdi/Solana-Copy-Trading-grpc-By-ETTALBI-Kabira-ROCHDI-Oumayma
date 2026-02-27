@@ -1,0 +1,23 @@
+{
+    "rf_weight": 0.55,
+    "mlp_weight": 0.45,
+    "dl_available": true,
+    "classes": [
+        "BUY",
+        "HOLD",
+        "SELL"
+    ],
+    "features": [
+        "price",
+        "volume",
+        "volatility",
+        "liquidity",
+        "rsi",
+        "momentum",
+        "macd",
+        "trend",
+        "sentiment",
+        "holders",
+        "market_cap"
+    ]
+}
