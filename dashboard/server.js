@@ -4,6 +4,10 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { exec } from 'child_process';
 import fs from 'fs/promises';
+import { config } from '../config.js';
+import riskManager from '../services/riskManager.js';
+import notificationService from '../services/notifications.js';
+import { closeAllPositions } from '../main.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -69,6 +73,55 @@ app.get('/api/ml/stream', (req, res) => {
   }, 3000); // New prediction every 3 seconds
 
   req.on('close', () => clearInterval(interval));
+});
+
+// Dashboard Monitoring Endpoints
+app.get('/api/status', (req, res) => {
+  res.json({
+    bot: {
+      status: 'active', // You might want to make this dynamic later
+      uptime: riskManager.getDailyStats().uptime || 0
+    }
+  });
+});
+
+app.get('/api/risk', (req, res) => {
+  res.json(riskManager.getRiskMetrics());
+});
+
+app.get('/api/positions', (req, res) => {
+  res.json({
+    positions: riskManager.getActivePositions()
+  });
+});
+
+app.get('/api/history', (req, res) => {
+  res.json({
+    history: riskManager.tradeHistory
+  });
+});
+
+app.get('/api/config', (req, res) => {
+  res.json({
+    trading: config.trading,
+    risk: config.risk,
+    swap: config.swap
+  });
+});
+
+app.post('/api/emergency/close-all', async (req, res) => {
+  try {
+    const { reason } = req.body;
+    // Notify via risk manager that emergency close is starting
+    await riskManager.emergencyCloseAll(reason);
+
+    // Call the actual trading engine to close all positions via swap
+    const results = await closeAllPositions();
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Emergency close error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Start server

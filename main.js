@@ -1,5 +1,5 @@
 import { newlunched_subscribeCommand, stopNewLaunch } from "./grpc.js";
-import { token_buy, token_sell, getSplTokenBalance, getPublicKeyFromPrivateKey } from "./fuc.js";
+import { token_buy, token_sell, getSplTokenBalance, getPublicKeyFromPrivateKey, getCurrentPrice } from "./fuc.js";
 import { getBalance } from "./swap.js";
 import { config, validateConfig } from "./config.js";
 import logger from "./utils/logger.js";
@@ -19,9 +19,9 @@ export const pump_geyser = async () => {
   try {
     // Validate configuration
     validateConfig();
-    
+
     const walletKey = getPublicKeyFromPrivateKey();
-    
+
     // Log startup banner
     console.log(chalk.magentaBright(`
    ██████╗██████╗ ██╗   ██╗██████╗ ████████╗ ██████╗ ██╗  ██╗██╗███╗   ██╗ ██████╗ 
@@ -31,69 +31,69 @@ export const pump_geyser = async () => {
   ╚██████╗██║  ██║   ██║   ██║        ██║   ╚██████╔╝██║  ██╗██║██║ ╚████║╚██████╔╝
    ╚═════╝╚═╝  ╚═╝   ╚═╝   ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝ ╚═════╝ 
     `));
-    
+
     logger.info("🚀 Starting Solana Raydium Sniper Bot...");
     logger.info(`🔑 Wallet Public Key: ${walletKey}`);
     logger.info(`💰 Sniper Amount: ${tradingConfig.sniperAmount} SOL`);
     logger.info(`🎯 Profit Target: ${tradingConfig.profitTarget}x`);
     logger.info(`🛑 Stop Loss: ${tradingConfig.stopLoss}x`);
-    logger.info(`⏱️ Max Hold Time: ${tradingConfig.maxHoldTime/1000}s`);
+    logger.info(`⏱️ Max Hold Time: ${tradingConfig.maxHoldTime / 1000}s`);
     logger.info(`📊 Max Positions: ${tradingConfig.maxPositions}`);
-    
+
     // Log configuration
     logger.debug("Trading configuration loaded", tradingConfig);
     logger.debug("Pool filters", config.pools);
     logger.debug("Risk management settings", config.risk);
-    
+
     // Send startup notification
     await notificationService.notifyBotStatus("Started", {
       wallet: walletKey,
       config: tradingConfig,
     });
-    
+
     // Start monitoring for new token launches
     await newlunched_subscribeCommand();
-    
+
     // Set up position monitoring
     setInterval(monitorPositions, 5000); // Check positions every 5 seconds
-    
+
     // Set up risk monitoring
     setInterval(monitorRisk, 10000); // Check risk metrics every 10 seconds
-    
+
     // Set up graceful shutdown
     process.on('SIGINT', async () => {
       logger.warn("🛑 Shutting down sniper bot...");
       stopNewLaunch();
-      
+
       // Close all positions before exit
       await closeAllPositions();
-      
+
       // Send shutdown notification
       await notificationService.notifyBotStatus("Shutdown", {
         reason: "SIGINT received",
         finalStats: riskManager.getDailyStats(),
       });
-      
+
       process.exit(0);
     });
-    
+
     // Handle other shutdown signals
     process.on('SIGTERM', async () => {
       logger.warn("🛑 SIGTERM received, shutting down...");
       await handleGracefulShutdown("SIGTERM");
     });
-    
+
     process.on('uncaughtException', async (error) => {
       logger.error("Uncaught exception", error);
       await notificationService.notifyError(error, "Uncaught Exception");
       await handleGracefulShutdown("Uncaught Exception");
     });
-    
+
     process.on('unhandledRejection', async (reason, promise) => {
       logger.error("Unhandled rejection", { reason, promise });
       await notificationService.notifyError(new Error(reason), "Unhandled Rejection");
     });
-    
+
   } catch (error) {
     logger.error("Error in pump_geyser", error);
     await notificationService.notifyError(error, "Bot Startup");
@@ -105,7 +105,7 @@ export const pump_geyser = async () => {
 async function monitorPositions() {
   try {
     const positions = riskManager.getActivePositions();
-    
+
     for (const position of positions) {
       try {
         const currentBalance = await getSplTokenBalance(position.mint);
@@ -115,9 +115,11 @@ async function monitorPositions() {
           continue;
         }
 
-        // Update position price (you'll need to implement price fetching)
-        // const currentPrice = await getCurrentPrice(position.mint);
-        // riskManager.updatePositionPrice(position.mint, currentPrice);
+        // Update position price using Jupiter API
+        const currentPrice = await getCurrentPrice(position.mint);
+        if (currentPrice) {
+          riskManager.updatePositionPrice(position.mint, currentPrice);
+        }
 
         // Check if position should be closed
         const shouldClose = riskManager.shouldClosePosition(position.mint);
@@ -138,7 +140,7 @@ async function monitorPositions() {
 async function monitorRisk() {
   try {
     const riskMetrics = riskManager.getRiskMetrics();
-    
+
     // Log risk metrics periodically
     if (riskMetrics.riskLevel === 'HIGH') {
       logger.warn("High risk level detected", riskMetrics);
@@ -148,13 +150,13 @@ async function monitorRisk() {
         riskMetrics
       );
     }
-    
+
     // Log daily stats every hour
     const now = new Date();
     if (now.getMinutes() === 0) {
       logger.info("Hourly risk summary", riskMetrics);
     }
-    
+
   } catch (error) {
     logger.error("Error in risk monitoring", error);
   }
@@ -164,7 +166,7 @@ async function monitorRisk() {
 async function closePosition(mint, position, reason = 'manual') {
   try {
     logger.info(`Closing position for ${mint}`, { reason, position });
-    
+
     // Get current token balance
     const currentBalance = await getSplTokenBalance(mint);
     if (!currentBalance || currentBalance <= 0) {
@@ -175,17 +177,17 @@ async function closePosition(mint, position, reason = 'manual') {
 
     // Execute sell transaction
     const sellResult = await token_sell(mint, currentBalance);
-    
+
     if (sellResult && sellResult.txHash) {
       logger.info(`Position closed successfully for ${mint}`, {
         txHash: sellResult.txHash,
         reason,
         balance: currentBalance,
       });
-      
+
       // Record the trade
       riskManager.recordTrade('sell', mint, currentBalance, position.currentPrice || 0, sellResult.txHash);
-      
+
       // Send notification
       await notificationService.notifyPositionUpdate('closed', mint, {
         reason,
@@ -206,9 +208,9 @@ async function closeAllPositions() {
   try {
     const positions = riskManager.getActivePositions();
     logger.info(`Closing ${positions.length} active positions...`);
-    
+
     const results = [];
-    
+
     for (const position of positions) {
       try {
         await closePosition(position.mint, position, 'shutdown');
@@ -218,7 +220,7 @@ async function closeAllPositions() {
         results.push({ mint: position.mint, status: 'error', error: error.message });
       }
     }
-    
+
     logger.info("Position closure summary", { results });
     return results;
   } catch (error) {
@@ -231,19 +233,19 @@ async function closeAllPositions() {
 async function handleGracefulShutdown(reason) {
   try {
     logger.warn(`Graceful shutdown initiated: ${reason}`);
-    
+
     // Stop gRPC monitoring
     stopNewLaunch();
-    
+
     // Close all positions
     await closeAllPositions();
-    
+
     // Send final notification
     await notificationService.notifyBotStatus("Shutdown", {
       reason,
       finalStats: riskManager.getDailyStats(),
     });
-    
+
     logger.info("Graceful shutdown completed");
     process.exit(0);
   } catch (error) {
@@ -260,8 +262,8 @@ async function handleNewTokenLaunch(tokenMint, poolStatus, context) {
       context,
       timestamp: new Date().toISOString(),
     })
-    
-     const copiedTrade = await copyTrading.processTrackedWalletTransaction({
+
+    const copiedTrade = await copyTrading.processTrackedWalletTransaction({
       from: context.transactionFrom || context.wallet,
       amount: context.transactionAmount,
       tokenMint: tokenMint,
@@ -270,7 +272,7 @@ async function handleNewTokenLaunch(tokenMint, poolStatus, context) {
       hash: context.txHash,
     })
 
-     // Determine the amount to trade (either copied amount or sniper amount)
+    // Determine the amount to trade (either copied amount or sniper amount)
     let tradeAmount = config.trading.sniperAmount
     let isCopyTrade = false
 
@@ -293,7 +295,7 @@ async function handleNewTokenLaunch(tokenMint, poolStatus, context) {
 
     // Execute the sniper trade
     logger.info(`Executing sniper trade for ${tokenMint}`);
-    
+
     // Get current SOL balance
     const solBalance = await getBalance();
     if (solBalance < config.trading.sniperAmount) {
@@ -303,20 +305,20 @@ async function handleNewTokenLaunch(tokenMint, poolStatus, context) {
 
     // Execute buy transaction
     const buyResult = await token_buy(tokenMint, config.trading.sniperAmount);
-    
+
     if (buyResult && buyResult.txHash) {
       logger.info(`Sniper trade executed successfully for ${tokenMint}`, {
         txHash: buyResult.txHash,
         amount: config.trading.sniperAmount,
         poolStatus,
       });
-      
+
       // Record the trade
       riskManager.recordTrade('buy', tokenMint, config.trading.sniperAmount, 0, buyResult.txHash);
-      
+
       // Send notification
       await notificationService.notifyTradeExecution('buy', tokenMint, config.trading.sniperAmount, 0, buyResult.txHash);
-      
+
       // Add to active positions for monitoring
       const position = {
         entryPrice: 0, // Will be updated when we get price data
@@ -327,19 +329,19 @@ async function handleNewTokenLaunch(tokenMint, poolStatus, context) {
         poolStatus,
         context,
       };
-      
+
       riskManager.activePositions.set(tokenMint, position);
-      
+
       logger.info(`Position opened for ${tokenMint}`, position);
-      
+
     } else {
       logger.error(`Failed to execute sniper trade for ${tokenMint}`);
       await notificationService.notifyError(
-        new Error('Buy transaction failed'), 
+        new Error('Buy transaction failed'),
         `Sniper Trade - ${tokenMint}`
       );
     }
-    
+
   } catch (error) {
     logger.error(`Error handling new token launch for ${tokenMint}`, error);
     await notificationService.notifyError(error, `New Token Launch - ${tokenMint}`);

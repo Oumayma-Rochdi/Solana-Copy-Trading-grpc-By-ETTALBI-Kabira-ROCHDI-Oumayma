@@ -14,6 +14,11 @@
             "date": 1772103221453,
             "name": "logs\\trading-bot-error-2026-02-26.log",
             "hash": "1410a7b344e0d7f99f6b8017c78e74023ddf323685a64e5d820444782b55a736"
+        },
+        {
+            "date": 1772190094458,
+            "name": "logs\\trading-bot-error-2026-02-27.log",
+            "hash": "254f16944894ec93a6920e71a536a43a6ce3a14a1ed129e24295c8afdc8b52e0"
         }
     ],
     "hashType": "sha256"

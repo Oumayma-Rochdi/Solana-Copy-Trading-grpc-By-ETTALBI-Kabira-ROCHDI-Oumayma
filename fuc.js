@@ -3,6 +3,7 @@ import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import chalk from "chalk";
 import dotenv from "dotenv";
 import bs58 from "bs58";
+import axios from "axios";
 dotenv.config();
 import { swap } from "./swap.js";
 // import { buy_pumpfun, buy_pumpswap, sell_pumpfun, sell_pumpswap } from "./swapsdk_0slot.js";
@@ -12,8 +13,8 @@ const RPC_URL = process.env.RPC_URL;
 const connection = new Connection(RPC_URL, "confirmed");
 
 //============functions============//
-export const token_buy = async (mint, sol_amount, pool_status,  context) => {
- 
+export const token_buy = async (mint, sol_amount, pool_status, context) => {
+
   if (!mint) {
     throw new Error("mint is required and was not provided.");
   }
@@ -26,7 +27,7 @@ export const token_buy = async (mint, sol_amount, pool_status,  context) => {
   // if (pool_status == "pumpfun") {
   //   txid = await buy_pumpfun(mint, sol_amount * LAMPORTS_PER_SOL, context);//off chain sign ultra fast
   // } else if (pool_status == "pumpswap") {
-   
+
   //   txid = await buy_pumpswap(mint, sol_amount * LAMPORTS_PER_SOL, context.pool);
   // } else if (pool_status == "raydium_launchlab") {
   //   txid = await buy_raydium_launchpad(mint, sol_amount * LAMPORTS_PER_SOL, context);
@@ -41,15 +42,15 @@ export const token_buy = async (mint, sol_amount, pool_status,  context) => {
 
 export const token_sell = async (mint, tokenAmount, pool_status, isFull, context) => {
   try {
-   
+
     if (!mint) {
       throw new Error("mint is required and was not provided.");
     }
     console.log(chalk.red(`🔴SELL tokenAmount:::${tokenAmount} pool_status: ${pool_status} `));
 
     const currentUTC = new Date();
-    
-  //============off chain sign ultra fast============//
+
+    //============off chain sign ultra fast============//
     // let txid = "";
     // if (pool_status == "pumpfun") {
     //   txid = await sell_pumpfun(mint, tokenAmount, isFull, context);
@@ -142,6 +143,16 @@ export const checkWalletBalance = async () => {
   } catch (err) {
     console.error("Error checking wallet balance:", err.message || err);
     throw err;
+  }
+};
+
+export const getCurrentPrice = async (mint) => {
+  try {
+    const response = await axios.get(`https://price.jup.ag/v6/price?ids=${mint}`);
+    return response.data.data[mint]?.price || null;
+  } catch (error) {
+    console.error(`Error fetching price for ${mint}:`, error.message);
+    return null;
   }
 };
 
