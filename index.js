@@ -3,7 +3,6 @@ import { config, validateConfig } from "./config.js";
 import logger from "./utils/logger.js";
 import notificationService from "./services/notifications.js";
 import riskManager from "./services/riskManager.js";
-import { initializeDeploy } from "./services/deploy.js";
 
 // Check wallet balance
 const checkWalletBalance = async () => {
@@ -69,16 +68,6 @@ try {
 // Main startup function
 const main = async () => {
   try {
-    // await initializeDeploy()
-    //   .then(() => {
-    //     logger.info("Deploy initialized successfully");
-    //   })
-    //   .catch((error) => {
-    //     logger.error("Failed to initialize deploy", error);
-    //     process.exit(1);
-    //   });
-    // logger.info("🚀 Starting Solana Trading Bot...");
-
     // Check wallet balance
     await checkWalletBalance();
 
