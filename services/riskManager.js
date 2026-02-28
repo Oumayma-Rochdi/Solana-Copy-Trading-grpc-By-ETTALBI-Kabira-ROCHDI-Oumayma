@@ -17,10 +17,13 @@ class RiskManager {
       startTime: new Date(),
     };
 
-    this.virtualBalance = 0; // Will be synced with real wallet balance
+    this.simulatedCashDelta = 0;
     this.activePositions = new Map();
     this.tradeHistory = [];
     this.lastTradeTime = 0;
+    this.realBalance = 0;
+    this.virtualBalance = 0;
+    this.simulatedRealizedPnL = 0; // For stats
 
     // Initialize connection
     this.connection = new Connection(config.wallet.rpcUrl, 'confirmed');
@@ -31,21 +34,32 @@ class RiskManager {
       logger.error('[RiskManager] Invalid private key in config', err);
     }
 
-    // Initial balance sync
+    // Initial balance sync (one-time initialization)
+    this.isInitialized = false;
     this.syncWalletBalance();
 
     // Reset daily stats at midnight
     this.scheduleDailyReset();
   }
 
-  // Sync virtualBalance with real Solana wallet balance
+  // Sync realBalance with real Solana wallet balance
   async syncWalletBalance() {
     if (!this.publicKey) return;
 
     try {
       const balanceLamports = await this.connection.getBalance(this.publicKey);
-      this.virtualBalance = balanceLamports / LAMPORTS_PER_SOL;
-      logger.debug(`[RiskManager] Wallet balance synced: ${this.virtualBalance} SOL`);
+      this.realBalance = balanceLamports / LAMPORTS_PER_SOL;
+      
+      // Update virtualBalance (Equity) = Real Balance + Simulated Cash Delta + Total Position Value
+      const positions = this.getActivePositions();
+      const totalPositionValue = positions.reduce((sum, pos) => {
+        const pnlRatio = pos.currentPrice / pos.entryPrice;
+        return sum + (pos.entryAmount * pnlRatio);
+      }, 0);
+
+      this.virtualBalance = this.realBalance + this.simulatedCashDelta + totalPositionValue;
+      
+      logger.debug(`[RiskManager] Balance synced - Real: ${this.realBalance}, Equity: ${this.virtualBalance}`);
     } catch (err) {
       logger.error('[RiskManager] Error syncing wallet balance', err);
     }
@@ -114,13 +128,17 @@ class RiskManager {
         entryPrice: price,
         entryAmount: amount, // Assuming amount is in SOL
         entryTime: now,
-        entryValue: amount * price,
+        entryValue: amount, // Value in SOL
         currentPrice: price,
         tradeId: trade.id,
+        txHash: txHash
       });
 
-      this.virtualBalance -= amount; // Deduct SOL size completely from virtual wallet
-
+      // If it's a simulated trade, subtract cost from sim cash delta to reflect "spent" SOL
+      if (!txHash || txHash.startsWith('sim_')) {
+        this.simulatedCashDelta -= amount;
+      }
+      
       logger.info(`Position opened: ${tokenMint}`, {
         entryPrice: price,
         entryAmount: amount,
@@ -133,27 +151,41 @@ class RiskManager {
         entryValue: amount * price,
       });
     } else if (tradeType === 'sell') {
-      const tradeId = tokenMintOrTradeId;
-      const position = this.activePositions.get(tradeId);
+      const tradeIdOrMint = tokenMintOrTradeId;
+      // Try to find by key (tradeId) or by tokenMint
+      let tradeId = tradeIdOrMint;
+      let position = this.activePositions.get(tradeId);
+      
+      if (!position) {
+        // Fallback: search by tokenMint in values
+        for (const [key, pos] of this.activePositions.entries()) {
+          if (pos.tokenMint === tradeIdOrMint || pos.mint === tradeIdOrMint) {
+            tradeId = key;
+            position = pos;
+            break;
+          }
+        }
+      }
+
       if (position) {
-        const tokenMint = position.tokenMint;
+        const tokenMint = position.tokenMint || position.mint;
         trade.tokenMint = tokenMint;
         trade.id = `${tokenMint}-sell-${now}`;
 
-        const exitValue = amount * price;
-        const pnl = exitValue - position.entryValue;
-        const pnlRatio = exitValue / position.entryValue;
-
+        const pnlRatio = price / position.entryPrice;
+        const pnl = position.entryAmount * (pnlRatio - 1);
+        
         trade.pnl = pnl;
         trade.pnlRatio = pnlRatio;
         trade.entryPrice = position.entryPrice;
-        trade.entryValue = position.entryValue;
+        trade.entryValue = position.entryAmount;
 
-        // Add back initial amount + profit/loss (in SOL terms)
-        const solReturned = position.entryAmount * pnlRatio;
-        this.virtualBalance += solReturned;
+        // If it was a simulated trade, add back result (cost + PnL) to sim cash delta
+        if (!position.txHash || position.txHash.startsWith('sim_')) {
+          this.simulatedCashDelta += position.entryAmount * pnlRatio;
+        }
 
-        // Update daily stats
+        this.simulatedRealizedPnL += pnl; // Keep for history/stats
         this.updateDailyStats(pnl, pnlRatio > 1);
 
         // Remove from active positions
@@ -192,9 +224,8 @@ class RiskManager {
     const position = this.activePositions.get(tokenMint);
     if (position) {
       position.currentPrice = newPrice;
-      position.currentValue = position.entryAmount * newPrice;
-      position.pnl = position.currentValue - position.entryValue;
-      position.pnlRatio = position.currentValue / position.entryValue;
+      const pnlRatio = newPrice / position.entryPrice;
+      position.pnl = position.entryAmount * (pnlRatio - 1); // SOL PnL
     }
   }
 
@@ -231,8 +262,10 @@ class RiskManager {
 
   // Get sequence of positions 
   getActivePositions() {
-    return Array.from(this.activePositions.entries()).map(([tradeId, position]) => ({
+    return Array.from(this.activePositions.entries()).map(([key, position]) => ({
       ...position,
+      tradeId: position.tradeId || key, // Ensure we have the map key
+      mint: position.tokenMint || position.mint || (key.includes('-') ? key.split('-')[0] : key),
       holdTime: Date.now() - position.entryTime,
     }));
   }
@@ -240,13 +273,13 @@ class RiskManager {
   // Get position summary
   getPositionSummary() {
     const positions = this.getActivePositions();
-    const totalValue = positions.reduce((sum, pos) => sum + pos.currentValue, 0);
-    const totalPnL = positions.reduce((sum, pos) => sum + pos.pnl, 0);
+    const totalPnL = positions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
+    const totalExposure = positions.reduce((sum, pos) => sum + pos.entryAmount, 0);
 
     return {
       activePositions: positions.length,
-      totalValue,
       totalPnL,
+      totalExposure,
       averagePnL: positions.length > 0 ? totalPnL / positions.length : 0,
     };
   }

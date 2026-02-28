@@ -108,21 +108,27 @@ async function monitorPositions() {
 
     for (const position of positions) {
       try {
-        const currentBalance = await getSplTokenBalance(position.mint);
-        if (!currentBalance || currentBalance <= 0) {
-          logger.warn(`⚠️ No balance for ${position.mint}, removing from active positions`);
-          riskManager.activePositions.delete(position.mint);
-          continue;
+        const mint = position.mint;
+        const tradeId = position.tradeId || mint;
+        const isSimulated = !position.txHash || position.txHash.startsWith('sim_');
+
+        if (!isSimulated) {
+          const currentBalance = await getSplTokenBalance(mint);
+          if (!currentBalance || currentBalance <= 0) {
+            logger.warn(`⚠️ No balance for ${mint}, removing from active positions`);
+            riskManager.activePositions.delete(tradeId);
+            continue;
+          }
         }
 
         // Update position price using Jupiter API
-        const currentPrice = await getCurrentPrice(position.mint);
+        const currentPrice = await getCurrentPrice(mint);
         if (currentPrice) {
-          riskManager.updatePositionPrice(position.mint, currentPrice);
+          riskManager.updatePositionPrice(tradeId, currentPrice);
         }
 
         // Check if position should be closed
-        const shouldClose = riskManager.shouldClosePosition(position.mint);
+        const shouldClose = riskManager.shouldClosePosition(tradeId);
         if (shouldClose.shouldClose) {
           logger.info(`Position closure triggered for ${position.mint}: ${shouldClose.reason}`);
           await closePosition(position.mint, position, shouldClose.reason);
@@ -165,17 +171,21 @@ async function monitorRisk() {
 // Close a specific position
 async function closePosition(mint, position, reason = 'manual') {
   try {
-    logger.info(`Closing position for ${mint}`, { reason, position });
+    const tradeId = position.tradeId || mint;
+    logger.info(`Closing position for ${mint} (ID: ${tradeId})`, { reason, position });
 
     // Get current token balance
     const currentBalance = await getSplTokenBalance(mint);
+    
+    // If no balance found, it might be a simulated/paper trade
     if (!currentBalance || currentBalance <= 0) {
-      logger.warn(`No balance to sell for ${mint}`);
-      riskManager.activePositions.delete(mint);
+      logger.info(`No on-chain balance for ${mint}, treating as simulated position closure`);
+      // Record simulated sell to realize PnL
+      riskManager.recordTrade('sell', tradeId, position.entryAmount, position.currentPrice || 0, 'sim_close_' + reason);
       return;
     }
 
-    // Execute sell transaction
+    // Execute real sell transaction for on-chain positions
     const sellResult = await token_sell(mint, currentBalance);
 
     if (sellResult && sellResult.txHash) {
@@ -185,8 +195,8 @@ async function closePosition(mint, position, reason = 'manual') {
         balance: currentBalance,
       });
 
-      // Record the trade
-      riskManager.recordTrade('sell', mint, currentBalance, position.currentPrice || 0, sellResult.txHash);
+      // Record the trade using the correct ID
+      riskManager.recordTrade('sell', tradeId, currentBalance, position.currentPrice || 0, sellResult.txHash);
 
       // Send notification
       await notificationService.notifyPositionUpdate('closed', mint, {
