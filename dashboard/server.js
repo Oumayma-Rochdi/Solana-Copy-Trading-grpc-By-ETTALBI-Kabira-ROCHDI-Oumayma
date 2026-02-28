@@ -6,8 +6,10 @@ import { exec } from 'child_process';
 import fs from 'fs/promises';
 import { config } from '../config.js';
 import riskManager from '../services/riskManager.js';
-import notificationService from '../services/notifications.js';
+import binanceService from '../services/binanceService.js';
+import aiAnalysisService from '../services/aiAnalysis.js';
 import { closeAllPositions } from '../main.js';
+import { token_buy, token_sell } from '../fuc.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -19,22 +21,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(join(__dirname, 'public')));
 
-// Generate random market data for simulation
-function generateMarketData() {
-  return {
-    price: 100 + Math.random() * 50,
-    volume: 1000000 + Math.random() * 50000000,
-    volatility: 1 + Math.random() * 8,
-    liquidity: 500000 + Math.random() * 9500000,
-    rsi: 20 + Math.random() * 60,
-    momentum: (Math.random() - 0.5) * 10,
-    macd: (Math.random() - 0.5) * 5,
-    trend: (Math.random() - 0.5) * 2,
-    sentiment: (Math.random() - 0.5) * 2,
-    holders: 10000 + Math.floor(Math.random() * 490000),
-    market_cap: 50000000 + Math.random() * 4950000000
-  };
-}
 
 // Endpoint to get live ML prediction stream
 app.get('/api/ml/stream', (req, res) => {
@@ -42,34 +28,43 @@ app.get('/api/ml/stream', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  const interval = setInterval(() => {
-    const features = generateMarketData();
+  const interval = setInterval(async () => {
+    try {
+      const features = await binanceService.getAggregatedMarketData();
 
-    // Write temp features file to pass to python script
-    const tempFile = join(__dirname, `temp_features_${Date.now()}.json`);
+      // Update active simulated positions with live price to fluctuate PnL
+      const positions = riskManager.getActivePositions();
+      for (const pos of positions) {
+        riskManager.updatePositionPrice(pos.tradeId, features.price);
+      }
 
-    fs.writeFile(tempFile, JSON.stringify(features))
-      .then(() => {
-        const scriptPath = join(dirname(__dirname), 'scripts', 'predict.py');
-        exec(`python "${scriptPath}" --input "${tempFile}"`, (error, stdout, stderr) => {
-          // Cleanup
-          fs.unlink(tempFile).catch(console.error);
+      // Write temp features file to pass to python script
+      const tempFile = join(__dirname, `temp_features_${Date.now()}.json`);
 
-          if (error) {
-            console.error('Python error:', error);
-            return;
-          }
+      fs.writeFile(tempFile, JSON.stringify(features))
+        .then(() => {
+          const scriptPath = join(dirname(__dirname), 'scripts', 'predict.py');
+          exec(`python "${scriptPath}" --input "${tempFile}"`, (error, stdout, stderr) => {
+            // Cleanup
+            fs.unlink(tempFile).catch(console.error);
 
-          try {
-            const prediction = JSON.parse(stdout);
-            res.write(`data: ${JSON.stringify({ features, prediction })}\n\n`);
-          } catch (e) {
-            console.error('Parse error:', e, stdout);
-          }
-        });
-      })
-      .catch(console.error);
+            if (error) {
+              console.error('Python error:', error);
+              return;
+            }
 
+            try {
+              const prediction = JSON.parse(stdout);
+              res.write(`data: ${JSON.stringify({ features, prediction, timestamp: Date.now() })}\n\n`);
+            } catch (e) {
+              console.error('Parse error:', e, stdout);
+            }
+          });
+        })
+        .catch(console.error);
+    } catch (error) {
+      console.error('Stream error:', error);
+    }
   }, 3000); // New prediction every 3 seconds
 
   req.on('close', () => clearInterval(interval));
@@ -85,8 +80,8 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-app.get('/api/risk', (req, res) => {
-  res.json(riskManager.getRiskMetrics());
+app.get('/api/risk', async (req, res) => {
+  res.json(await riskManager.getRiskMetrics());
 });
 
 app.get('/api/positions', (req, res) => {
@@ -107,6 +102,123 @@ app.get('/api/config', (req, res) => {
     risk: config.risk,
     swap: config.swap
   });
+});
+
+app.get('/api/market-data', async (req, res) => {
+  try {
+    const data = await binanceService.getAggregatedMarketData();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// AI Analysis Endpoints
+app.post('/api/ai/analyze-market', async (req, res) => {
+  try {
+    const { marketData } = req.body;
+    const analysis = await aiAnalysisService.analyzeMarketConditions(marketData);
+    res.json({ success: true, analysis });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/ai/suggestions', async (req, res) => {
+  try {
+    const { marketData } = req.body;
+    const positions = riskManager.getActivePositions();
+    const suggestions = await aiAnalysisService.getTradingSuggestions(positions, marketData);
+    res.json({ success: true, suggestions, count: suggestions.length });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/ai/risk-assessment', async (req, res) => {
+  try {
+    const positions = riskManager.getActivePositions();
+    const assessment = await aiAnalysisService.getRiskAssessment(positions);
+    res.json({ success: true, assessment });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/ai/history', (req, res) => {
+  const history = aiAnalysisService.getHistory();
+  res.json({ history, total: history.length });
+});
+
+app.get('/api/ai/current-suggestions', (req, res) => {
+  const suggestions = aiAnalysisService.getTradeSuggestions();
+  res.json({ suggestions, count: suggestions.length });
+});
+
+app.post('/api/ai/clear-history', (req, res) => {
+  aiAnalysisService.clearHistory();
+  res.json({ success: true });
+});
+
+app.post('/api/ai/analyze-market-stream', async (req, res) => {
+  try {
+    const { marketData } = req.body;
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const stream = aiAnalysisService.streamMarketAnalysis(marketData);
+    for await (const chunk of stream) {
+      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+    }
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('AI Stream error:', error);
+    res.end();
+  }
+});
+
+app.post('/api/trade/execute', async (req, res) => {
+  try {
+    const { action, symbol, amount, price } = req.body;
+    const SOL_MINT = 'So11111111111111111111111111111111111111112';
+
+    console.log(`Manual trade execution: ${action} ${symbol} for ${amount} SOL equivalent`);
+
+    // Prevent SOL-to-SOL swaps which Jupiter API rejects
+    if (symbol === 'SOL' || symbol === SOL_MINT) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid swap: Cannot ${action} SOL using SOL as the base. Please provide a different token mint address to trade.`
+      });
+    }
+
+    // =========================================================
+    // 💡 SIMULATION MODE: So it shows up on the Monitoring page
+    // =========================================================
+    if (action === 'BUY') {
+      // Record a buy trade -> adds it to Active Positions
+      riskManager.recordTrade("buy", symbol, amount, price, "ai_dashboard_exec");
+    } else if (action === 'SELL') {
+      // Close the specific position using tradeId (frontend sends ID as symbol)
+      const tradeId = symbol;
+      const hasPos = riskManager.activePositions.has(tradeId);
+      if (hasPos) {
+        const position = riskManager.activePositions.get(tradeId);
+        const exitPrice = price || position.currentPrice;
+        riskManager.recordTrade("sell", tradeId, position.entryAmount, exitPrice, "ai_dashboard_exec");
+      }
+    }
+
+    // Return a fake transaction hash for the dashboard simulation
+    const fakeTxId = "sim_" + Math.random().toString(36).substring(7);
+    res.json({ success: true, txHash: fakeTxId });
+
+  } catch (error) {
+    console.error('Manual trade error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.post('/api/emergency/close-all', async (req, res) => {

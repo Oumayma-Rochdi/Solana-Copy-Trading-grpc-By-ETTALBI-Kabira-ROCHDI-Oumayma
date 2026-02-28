@@ -198,7 +198,7 @@
                                 class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                             <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                         </span>
-                        Ensemble Mode Active (RF + Deep Learning)
+                        <span id="modelStatusHeader">Initializing Intelligence...</span>
                     </div>
                 </div>
             </div>
@@ -244,7 +244,8 @@
                                 id="heroModelType">
                                 WAITING FOR STREAM...
                             </span>
-                            <span class="text-xs text-gray-400 mono">MARKET SYNC: T-0.1s</span>
+                            <span class="text-xs text-gray-400 mono">LATENCY: <span id="marketLatency"
+                                    class="text-blue-400">0ms</span></span>
                         </div>
 
                         <div class="grid grid-cols-2 gap-4 mb-2">
@@ -279,6 +280,13 @@
                             <h2 class="text-6xl font-black tracking-tight" id="heroDecision">---</h2>
                             <p class="mt-2 text-sm text-gray-400">Confidence Score: <span
                                     class="font-bold mono text-white" id="heroConfidence">0%</span></p>
+
+                            <div class="mt-4 px-4">
+                                <input type="text" id="targetTokenMint"
+                                    placeholder="Enter Token Mint Address (e.g. USDC)"
+                                    class="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2 text-xs mono text-blue-400 focus:border-blue-500 outline-none transition-all"
+                                    value="EPjFW36vn7J98e7ScyrtN91PHMv6mEB26XV9p8KRovS">
+                            </div>
                         </div>
 
                         <div class="flex gap-4">
@@ -366,15 +374,48 @@
             log: document.getElementById('rawFeatureLog'),
             btnExecute: document.getElementById('btnExecute'),
             btnSkip: document.getElementById('btnSkip'),
-            toggleBtn: document.getElementById('toggleStream')
+            toggleBtn: document.getElementById('toggleStream'),
+            modelStatusHeader: document.getElementById('modelStatusHeader'),
+            marketLatency: document.getElementById('marketLatency'),
+            targetTokenMint: document.getElementById('targetTokenMint')
         };
 
+        let currentDecision = null;
+
         // Actions
-        DOM.btnExecute.addEventListener('click', () => {
+        DOM.btnExecute.addEventListener('click', async () => {
             if (DOM.btnExecute.classList.contains('opacity-50')) return;
-            showModal();
-            addLog(`> [USER ACTION] ⚡ EXECUTED suggestion: ${lastActionedLog}`, "text-green-300");
-            disableButtons();
+
+            const originalText = DOM.btnExecute.innerHTML;
+            DOM.btnExecute.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> EXECUTING...';
+            DOM.btnExecute.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                const response = await fetch('/api/trade/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: currentDecision.decision,
+                        symbol: DOM.targetTokenMint.value || 'SOL',
+                        amount: 0.1,   // Default simple amount
+                        price: currentDecision.price
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showModal();
+                    addLog(`> [USER ACTION] ⚡ EXECUTED: ${lastActionedLog} | TX: ${result.txHash.slice(0, 10)}...`, "text-green-300");
+                } else {
+                    addLog(`> [ERROR] ❌ Execution failed: ${result.error}`, "text-red-400");
+                }
+            } catch (error) {
+                addLog(`> [ERROR] ❌ Network error: ${error.message}`, "text-red-400");
+            } finally {
+                DOM.btnExecute.innerHTML = originalText;
+                disableButtons();
+            }
         });
 
         DOM.btnSkip.addEventListener('click', () => {
@@ -451,13 +492,19 @@
                 const data = JSON.parse(e.data);
                 const p = data.prediction;
                 const f = data.features;
+                currentDecision = { decision: p.decision, price: f.price };
+
+                const start = parseFloat(new URLSearchParams(window.location.search).get('t') || Date.now());
+                const latency = Math.abs(Date.now() - (data.timestamp || Date.now()));
+                DOM.marketLatency.textContent = `${latency > 1000 ? (latency / 1000).toFixed(1) + 's' : latency + 'ms'}`;
 
                 // Update UI based on decision
                 DOM.decision.textContent = p.decision;
                 DOM.decision.className = `text-6xl font-black tracking-tight val-${p.decision.toLowerCase()}`;
 
                 DOM.confidence.textContent = `${p.confidence}%`;
-                DOM.modelType.textContent = `${p.model_type} [v2.0]`;
+                DOM.modelType.textContent = `${p.model_type}`;
+                DOM.modelStatusHeader.textContent = `${p.model_type} [v2.0] Active`;
 
                 // Accent Line Color
                 if (p.decision === 'BUY') DOM.accentLine.className = "absolute top-0 left-0 w-1 h-full shadow-[0_0_15px_#00ff88] bg-green-400 transition-colors duration-500";

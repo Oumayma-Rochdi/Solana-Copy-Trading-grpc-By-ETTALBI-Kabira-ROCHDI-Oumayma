@@ -146,8 +146,20 @@ export const checkWalletBalance = async () => {
   }
 };
 
+import binanceService from "./services/binanceService.js";
+
 export const getCurrentPrice = async (mint) => {
   try {
+    // Check if it's a major coin we track on Binance
+    const solMint = "So11111111111111111111111111111111111111112";
+    const btcMint = "qfnqkgno6pwbzw6ls266vj5r2px7sc9w9xsvu2rgv8sk"; // Wrapped BTC example
+    const ethMint = "7vf361p6mclux8uqqe6qltww2pwnmk6qysr7shlr3wzk"; // Wrapped ETH example
+
+    if (mint === solMint || mint === "SOL") {
+      const data = await binanceService.getAggregatedMarketData();
+      return data.solPrice;
+    }
+
     const response = await axios.get(`https://price.jup.ag/v6/price?ids=${mint}`);
     return response.data.data[mint]?.price || null;
   } catch (error) {

@@ -135,7 +135,7 @@ const handleShutdown = async (reason) => {
 
     // Get final statistics
     const finalStats = riskManager.getDailyStats();
-    const riskMetrics = riskManager.getRiskMetrics();
+    const riskMetrics = await riskManager.getRiskMetrics();
 
     // Send shutdown notification
     await notificationService.notifyBotStatus("Shutdown", {
