@@ -121,7 +121,7 @@ class TradingBotDashboard {
     async refreshAllData() {
         const refreshBtn = document.getElementById('refreshBtn');
         refreshBtn.classList.add('animate-spin');
-        
+
         try {
             await this.loadInitialData();
             this.showSuccess('Dashboard refreshed successfully');
@@ -134,27 +134,27 @@ class TradingBotDashboard {
     }
 
     startAutoRefresh() {
-        // Refresh data every 30 seconds
+        // Refresh data every 3 seconds to match AI Engine
         this.refreshInterval = setInterval(() => {
             this.loadStatus();
             this.loadMarketData();
             this.loadRiskMetrics();
             this.loadPositions();
-        }, 30000);
+        }, 3000);
     }
 
     async loadStatus() {
         try {
             const response = await fetch('/api/status');
             const data = await response.json();
-            
+
             // Update bot status
             const statusElement = document.getElementById('botStatus');
             statusElement.innerHTML = `
                 <i class="fas fa-circle mr-2"></i>${data.bot.status}
             `;
             statusElement.className = `font-bold status-${data.bot.status}`;
-            
+
         } catch (error) {
             console.error('Error loading status:', error);
         }
@@ -164,14 +164,17 @@ class TradingBotDashboard {
         try {
             const response = await fetch('/api/market-data');
             const data = await response.json();
-            
+
             if (document.getElementById('solPrice')) {
                 document.getElementById('solPrice').textContent = `$${data.solPrice.toFixed(2)}`;
                 document.getElementById('solChange').textContent = `${data.momentum > 0 ? '+' : ''}${data.momentum.toFixed(2)}%`;
                 document.getElementById('solChange').className = `text-xs font-bold ${data.momentum >= 0 ? 'text-green-400' : 'text-red-400'}`;
-                
+
                 document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
-                document.getElementById('ethPrice').textContent = `$${data.ethPrice.toLocaleString()}`;
+
+                // ethPrice element has been replaced by virtualBalance
+                // document.getElementById('ethPrice').textContent = `$${data.ethPrice.toLocaleString()}`;
+
                 document.getElementById('solVolume').textContent = `$${(data.volume24h / 1000000).toFixed(1)}M`;
             }
         } catch (error) {
@@ -183,19 +186,26 @@ class TradingBotDashboard {
         try {
             const response = await fetch('/api/risk');
             const data = await response.json();
-            
+
             // Update quick stats
+            if (document.getElementById('virtualBalance')) {
+                document.getElementById('virtualBalance').textContent = `${data.dailyStats.virtualBalance.toFixed(4)} SOL`;
+            }
+
+            // Realized + Unrealized PnL
+            const totalLivePnL = data.dailyStats.netPnL + data.positionSummary.totalPnL;
+
             document.getElementById('activePositions').textContent = data.positionSummary.activePositions;
-            document.getElementById('dailyPnL').textContent = `${data.dailyStats.netPnL.toFixed(4)} SOL`;
+            document.getElementById('dailyPnL').textContent = `${totalLivePnL.toFixed(4)} SOL`;
             document.getElementById('winRate').textContent = `${data.dailyStats.winRate}%`;
             document.getElementById('riskLevel').textContent = data.riskLevel;
-            
+
             // Update PnL chart
-            this.updatePnLChart(data.dailyStats);
-            
+            this.updatePnLChart(totalLivePnL);
+
             // Update positions chart
-            this.updatePositionsChart(data.positionSummary);
-            
+            this.updatePositionsChart(data.positionSummary, data.dailyStats);
+
         } catch (error) {
             console.error('Error loading risk metrics:', error);
         }
@@ -205,9 +215,9 @@ class TradingBotDashboard {
         try {
             const response = await fetch('/api/positions');
             const data = await response.json();
-            
+
             this.updatePositionsTable(data.positions);
-            
+
         } catch (error) {
             console.error('Error loading positions:', error);
         }
@@ -217,9 +227,9 @@ class TradingBotDashboard {
         try {
             const response = await fetch('/api/history');
             const data = await response.json();
-            
+
             this.updateHistoryTable(data.history);
-            
+
         } catch (error) {
             console.error('Error loading history:', error);
         }
@@ -229,45 +239,45 @@ class TradingBotDashboard {
         try {
             const response = await fetch('/api/config');
             const data = await response.json();
-            
+
             this.updateConfigurationGrid(data);
-            
+
         } catch (error) {
             console.error('Error loading configuration:', error);
         }
     }
 
-    updatePnLChart(dailyStats) {
+    updatePnLChart(totalLivePnL) {
         const chart = this.charts.pnl;
-        
+
         // Add current data point
         const now = new Date();
         const timeLabel = now.toLocaleTimeString();
-        
+
         chart.data.labels.push(timeLabel);
-        chart.data.datasets[0].data.push(dailyStats.netPnL);
-        
+        chart.data.datasets[0].data.push(totalLivePnL);
+
         // Keep only last 20 data points
         if (chart.data.labels.length > 20) {
             chart.data.labels.shift();
             chart.data.datasets[0].data.shift();
         }
-        
+
         chart.update();
     }
 
-    updatePositionsChart(positionSummary) {
+    updatePositionsChart(positionSummary, dailyStats) {
         const chart = this.charts.positions;
         chart.data.datasets[0].data = [
             positionSummary.activePositions,
-            positionSummary.totalPositions || 0
+            dailyStats ? dailyStats.totalTrades : 0
         ];
         chart.update();
     }
 
     updatePositionsTable(positions) {
         const tbody = document.getElementById('positionsTableBody');
-        
+
         if (positions.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -276,26 +286,27 @@ class TradingBotDashboard {
             `;
             return;
         }
-        
+
         tbody.innerHTML = positions.map(position => `
-            <tr class="border-b border-gray-700">
+            <tr class="border-b border-gray-700 hover:bg-white/5 transition-colors duration-200">
                 <td class="p-3">
                     <div class="flex items-center space-x-2">
-                        <span class="font-mono text-sm">${position.mint.substring(0, 8)}...</span>
-                        <button class="text-blue-400 hover:text-blue-300" onclick="copyToClipboard('${position.mint}')">
+                        <span class="font-mono text-sm">${(position.tokenMint || position.mint || 'Unknown').substring(0, 8)}...</span>
+                        <button class="text-blue-400 hover:text-blue-300" onclick="copyToClipboard('${position.tokenMint || position.mint}')">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
                 </td>
+                <td class="p-3 font-semibold text-emerald-400">${position.entryAmount.toFixed(4)} SOL</td>
                 <td class="p-3">${position.entryPrice.toFixed(6)}</td>
                 <td class="p-3">${(position.currentPrice || position.entryPrice).toFixed(6)}</td>
-                <td class="p-3 ${position.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">
+                <td class="p-3 font-bold ${position.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">
                     ${(position.pnl || 0).toFixed(4)} SOL
                 </td>
-                <td class="p-3">${this.formatDuration(position.holdTime)}</td>
+                <td class="p-3 text-gray-400 text-xs">${this.formatDuration(position.holdTime)}</td>
                 <td class="p-3">
-                    <button class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm transition-colors" 
-                            onclick="closePosition('${position.mint}')">
+                    <button class="bg-red-600/20 text-red-500 border border-red-500/50 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-all" 
+                            onclick="closePosition('${position.tradeId}')">
                         Close
                     </button>
                 </td>
@@ -305,7 +316,7 @@ class TradingBotDashboard {
 
     updateHistoryTable(history) {
         const tbody = document.getElementById('historyTableBody');
-        
+
         if (history.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -314,7 +325,7 @@ class TradingBotDashboard {
             `;
             return;
         }
-        
+
         tbody.innerHTML = history.slice(-10).reverse().map(trade => `
             <tr class="border-b border-gray-700">
                 <td class="p-3">${new Date(trade.timestamp).toLocaleString()}</td>
@@ -337,7 +348,7 @@ class TradingBotDashboard {
 
     updateConfigurationGrid(config) {
         const grid = document.getElementById('configGrid');
-        
+
         const configItems = [
             { label: 'Sniper Amount', value: `${config.trading.sniperAmount} SOL` },
             { label: 'Profit Target', value: `${config.trading.profitTarget}x` },
@@ -349,7 +360,7 @@ class TradingBotDashboard {
             { label: 'Slippage', value: `${config.swap.slippageTolerance}%` },
             { label: 'Priority Fee', value: `${config.swap.priorityFee} lamports` }
         ];
-        
+
         grid.innerHTML = configItems.map(item => `
             <div class="bg-gray-800 p-4 rounded-lg">
                 <div class="text-sm text-gray-400">${item.label}</div>
@@ -371,22 +382,22 @@ class TradingBotDashboard {
     async emergencyCloseAll() {
         try {
             this.hideEmergencyModal();
-            
+
             const response = await fetch('/api/emergency/close-all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: 'dashboard_emergency' })
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
                 this.showSuccess('Emergency closure initiated');
                 this.refreshAllData();
             } else {
                 this.showError('Failed to initiate emergency closure');
             }
-            
+
         } catch (error) {
             console.error('Error during emergency closure:', error);
             this.showError('Error during emergency closure');
@@ -397,7 +408,7 @@ class TradingBotDashboard {
         const seconds = Math.floor(ms / 1000);
         const minutes = Math.floor(seconds / 60);
         const hours = Math.floor(minutes / 60);
-        
+
         if (hours > 0) {
             return `${hours}h ${minutes % 60}m`;
         } else if (minutes > 0) {
@@ -417,13 +428,12 @@ class TradingBotDashboard {
 
     showNotification(message, type) {
         const notification = document.createElement('div');
-        notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-            type === 'success' ? 'bg-green-600' : 'bg-red-600'
-        }`;
+        notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            }`;
         notification.textContent = message;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.remove();
         }, 3000);
@@ -431,15 +441,39 @@ class TradingBotDashboard {
 }
 
 // Global functions for table actions
-window.copyToClipboard = function(text) {
+window.copyToClipboard = function (text) {
     navigator.clipboard.writeText(text).then(() => {
         // Could show a toast notification here
     });
 };
 
-window.closePosition = function(mint) {
-    // Implement individual position closure
-    console.log('Closing position for:', mint);
+window.closePosition = async function (tradeId) {
+    console.log('Closing position for:', tradeId);
+    try {
+        const solPriceEl = document.getElementById('solPrice');
+        const currentPrice = solPriceEl ? parseFloat(solPriceEl.textContent.replace('$', '')) : 0;
+
+        const response = await fetch('/api/trade/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'SELL',
+                symbol: tradeId,
+                amount: 0,
+                price: currentPrice
+            })
+        });
+        const result = await response.json();
+        if (result.success) {
+            window.dashboard.showSuccess('Position closed successfully');
+            window.dashboard.refreshAllData();
+        } else {
+            window.dashboard.showError('Failed to close: ' + result.error);
+        }
+    } catch (e) {
+        window.dashboard.showError('Network error closing position');
+        console.error(e);
+    }
 };
 
 // Initialize dashboard when page loads

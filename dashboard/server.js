@@ -32,6 +32,12 @@ app.get('/api/ml/stream', (req, res) => {
     try {
       const features = await binanceService.getAggregatedMarketData();
 
+      // Update active simulated positions with live price to fluctuate PnL
+      const positions = riskManager.getActivePositions();
+      for (const pos of positions) {
+        riskManager.updatePositionPrice(pos.tradeId, features.price);
+      }
+
       // Write temp features file to pass to python script
       const tempFile = join(__dirname, `temp_features_${Date.now()}.json`);
 
@@ -177,29 +183,38 @@ app.post('/api/trade/execute', async (req, res) => {
   try {
     const { action, symbol, amount, price } = req.body;
     const SOL_MINT = 'So11111111111111111111111111111111111111112';
-    
+
     console.log(`Manual trade execution: ${action} ${symbol} for ${amount} SOL equivalent`);
-    
+
     // Prevent SOL-to-SOL swaps which Jupiter API rejects
     if (symbol === 'SOL' || symbol === SOL_MINT) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Invalid swap: Cannot ${action} SOL using SOL as the base. Please provide a different token mint address to trade.` 
+      return res.status(400).json({
+        success: false,
+        error: `Invalid swap: Cannot ${action} SOL using SOL as the base. Please provide a different token mint address to trade.`
       });
     }
 
-    let result;
+    // =========================================================
+    // 💡 SIMULATION MODE: So it shows up on the Monitoring page
+    // =========================================================
     if (action === 'BUY') {
-      result = await token_buy(symbol, amount);
+      // Record a buy trade -> adds it to Active Positions
+      riskManager.recordTrade("buy", symbol, amount, price, "ai_dashboard_exec");
     } else if (action === 'SELL') {
-      result = await token_sell(symbol, amount);
+      // Close the specific position using tradeId (frontend sends ID as symbol)
+      const tradeId = symbol;
+      const hasPos = riskManager.activePositions.has(tradeId);
+      if (hasPos) {
+        const position = riskManager.activePositions.get(tradeId);
+        const exitPrice = price || position.currentPrice;
+        riskManager.recordTrade("sell", tradeId, position.entryAmount, exitPrice, "ai_dashboard_exec");
+      }
     }
-    
-    if (result) {
-      res.json({ success: true, txHash: result });
-    } else {
-      res.status(500).json({ success: false, error: 'Transaction failed or rejected by the network.' });
-    }
+
+    // Return a fake transaction hash for the dashboard simulation
+    const fakeTxId = "sim_" + Math.random().toString(36).substring(7);
+    res.json({ success: true, txHash: fakeTxId });
+
   } catch (error) {
     console.error('Manual trade error:', error);
     res.status(500).json({ success: false, error: error.message });

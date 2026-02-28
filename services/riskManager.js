@@ -15,10 +15,12 @@ class RiskManager {
       startTime: new Date(),
     };
 
+    this.virtualBalance = 2.5; // Starts with 2.5 SOL in paper trading
+
     this.activePositions = new Map();
     this.tradeHistory = [];
     this.lastTradeTime = 0;
-    
+
     // Reset daily stats at midnight
     this.scheduleDailyReset();
   }
@@ -63,14 +65,12 @@ class RiskManager {
   }
 
   // Record a new trade
-  recordTrade(tradeType, tokenMint, amount, price, txHash) {
+  recordTrade(tradeType, tokenMintOrTradeId, amount, price, txHash) {
     const now = Date.now();
     this.lastTradeTime = now;
 
     const trade = {
-      id: `${tokenMint}-${now}`,
       type: tradeType,
-      tokenMint,
       amount,
       price,
       txHash,
@@ -79,14 +79,21 @@ class RiskManager {
     };
 
     if (tradeType === 'buy') {
-      this.activePositions.set(tokenMint, {
+      const tokenMint = tokenMintOrTradeId;
+      trade.tokenMint = tokenMint;
+      trade.id = `${tokenMint}-${now}`;
+
+      this.activePositions.set(trade.id, {
+        tokenMint: tokenMint,
         entryPrice: price,
-        entryAmount: amount,
+        entryAmount: amount, // Assuming amount is in SOL
         entryTime: now,
         entryValue: amount * price,
         currentPrice: price,
         tradeId: trade.id,
       });
+
+      this.virtualBalance -= amount; // Deduct SOL size completely from virtual wallet
 
       logger.info(`Position opened: ${tokenMint}`, {
         entryPrice: price,
@@ -100,8 +107,13 @@ class RiskManager {
         entryValue: amount * price,
       });
     } else if (tradeType === 'sell') {
-      const position = this.activePositions.get(tokenMint);
+      const tradeId = tokenMintOrTradeId;
+      const position = this.activePositions.get(tradeId);
       if (position) {
+        const tokenMint = position.tokenMint;
+        trade.tokenMint = tokenMint;
+        trade.id = `${tokenMint}-sell-${now}`;
+
         const exitValue = amount * price;
         const pnl = exitValue - position.entryValue;
         const pnlRatio = exitValue / position.entryValue;
@@ -111,11 +123,15 @@ class RiskManager {
         trade.entryPrice = position.entryPrice;
         trade.entryValue = position.entryValue;
 
+        // Add back initial amount + profit/loss (in SOL terms)
+        const solReturned = position.entryAmount * pnlRatio;
+        this.virtualBalance += solReturned;
+
         // Update daily stats
         this.updateDailyStats(pnl, pnlRatio > 1);
 
         // Remove from active positions
-        this.activePositions.delete(tokenMint);
+        this.activePositions.delete(tradeId);
 
         logger.info(`Position closed: ${tokenMint}`, {
           pnl,
@@ -187,10 +203,9 @@ class RiskManager {
     return this.activePositions.get(tokenMint);
   }
 
-  // Get all active positions
+  // Get sequence of positions 
   getActivePositions() {
-    return Array.from(this.activePositions.entries()).map(([mint, position]) => ({
-      mint,
+    return Array.from(this.activePositions.entries()).map(([tradeId, position]) => ({
       ...position,
       holdTime: Date.now() - position.entryTime,
     }));
@@ -218,14 +233,15 @@ class RiskManager {
 
     return {
       ...this.dailyStats,
+      virtualBalance: this.virtualBalance,
       uptime,
-      winRate: this.dailyStats.totalTrades > 0 
+      winRate: this.dailyStats.totalTrades > 0
         ? (this.dailyStats.profitableTrades / this.dailyStats.totalTrades * 100).toFixed(2)
         : 0,
-      averageProfit: this.dailyStats.profitableTrades > 0 
+      averageProfit: this.dailyStats.profitableTrades > 0
         ? this.dailyStats.totalProfit / this.dailyStats.profitableTrades
         : 0,
-      averageLoss: this.dailyStats.losingTrades > 0 
+      averageLoss: this.dailyStats.losingTrades > 0
         ? this.dailyStats.totalLoss / this.dailyStats.losingTrades
         : 0,
     };
@@ -234,7 +250,7 @@ class RiskManager {
   // Update daily statistics
   updateDailyStats(pnl, isProfitable) {
     this.dailyStats.totalTrades++;
-    
+
     if (isProfitable) {
       this.dailyStats.profitableTrades++;
       this.dailyStats.totalProfit += pnl;
@@ -264,7 +280,7 @@ class RiskManager {
   // Reset daily statistics
   resetDailyStats() {
     const previousStats = { ...this.dailyStats };
-    
+
     this.dailyStats = {
       totalTrades: 0,
       profitableTrades: 0,
@@ -299,7 +315,7 @@ class RiskManager {
   // Emergency close all positions
   async emergencyCloseAll(reason = 'emergency') {
     logger.warn('Emergency closing all positions', { reason });
-    
+
     const positions = Array.from(this.activePositions.keys());
     const results = [];
 
@@ -310,7 +326,7 @@ class RiskManager {
           // Mark position for emergency closure
           position.emergencyClose = true;
           position.emergencyReason = reason;
-          
+
           results.push({
             mint,
             status: 'marked_for_closure',
@@ -346,7 +362,7 @@ class RiskManager {
   async getRiskMetrics() {
     const dailyStats = this.getDailyStats();
     const positionSummary = this.getPositionSummary();
-    
+
     return {
       dailyStats,
       positionSummary,
@@ -359,9 +375,9 @@ class RiskManager {
   async calculateRiskLevel() {
     const dailyStats = this.getDailyStats();
     const positionSummary = this.getPositionSummary();
-    
+
     let riskScore = 0;
-    
+
     // Market Volatility (Binance Integration)
     try {
       const marketData = await binanceService.getAggregatedMarketData();
@@ -373,7 +389,7 @@ class RiskManager {
     } catch (error) {
       logger.warn('Failed to fetch volatility for risk score', error);
     }
-    
+
     // Daily loss proximity
     if (dailyStats.netPnL <= -config.risk.maxDailyLoss * 0.9) {
       riskScore += 30;
